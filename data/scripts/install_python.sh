@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DIR=$1
+
 is_installed_python() {
     if command -v python3.11 &> /dev/null; then
         return 0
@@ -33,10 +35,39 @@ install_python() {
 }
 
 install_requirements() {
+    cd "$DIR" || exit
     python3.11 -m venv venv
     source venv/bin/activate
-    pip install --update pip setuptools wheel
-    pip install -r requirements.txt
+    pip install -U pip setuptools wheel
+
+    requirements=(
+        "ytmusicapi==1.8.2"
+        "yt-dlp==2024.10.7"
+        "icalendar==6.0.1"
+        "python-vlc==3.0.21203"
+        "curl_cffi~=0.7.3"
+        "numpy==1.26.4"
+        "g4f~=0.3.2.7"
+        "playsound<=1.3.0"
+        "flet~=0.25.0.dev3519"
+        "pyautogui~=0.9.54"
+        "PyAudio~=0.2.14"
+        "vosk~=0.3.45"
+        "voicesynth~=0.2.2.post3"
+        "PyYAML~=6.0.2"
+        "requests~=2.32.3"
+        "num2words~=0.5.13"
+        "matplotlib~=3.9.2"
+        "pynput~=1.7.7"
+        "plyer~=2.1.0"
+    )
+
+    # Loop through each package in the list and install it
+    for package in "${requirements[@]}"; do
+        pip install "$package"
+    done
+
+    pip install torch==2.2.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 }
 
 
