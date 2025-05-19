@@ -10,26 +10,53 @@ is_installed_python() {
     fi
 }
 
-
 install_python() {
     if command -v apt &> /dev/null; then
         echo "Detected apt (Debian/Ubuntu-based)"
         sudo apt update
-        sudo apt install -y python3.11
+        sudo apt install -y python3.11 python3.11-venv python3.11-dev
     elif command -v dnf &> /dev/null; then
         echo "Detected dnf (Fedora-based)"
-        sudo dnf install -y python3.11
+        sudo dnf install -y python3.11 python3.11-devel
     elif command -v yum &> /dev/null; then
         echo "Detected yum (RHEL/CentOS-based)"
-        sudo yum install -y python3.11
+        sudo yum install -y python3.11 python3.11-devel
     elif command -v pacman &> /dev/null; then
         echo "Detected pacman (Arch-based)"
-        sudo pacman -Sy python311
+        sudo pacman -Sy --noconfirm python python-pip base-devel
+        # Arch usually has python 3.11 as default or close
     elif command -v zypper &> /dev/null; then
         echo "Detected zypper (OpenSUSE-based)"
-        sudo zypper install -y python3.11
+        sudo zypper install -y python3 python3-devel
     else
         echo "No compatible package manager found. Please install Python 3.11 manually."
+        exit 1
+    fi
+}
+
+install_additional_packages() {
+    if command -v apt &> /dev/null; then
+        echo "Installing additional packages for apt-based system"
+        sudo apt update
+        sudo apt install -y mpv libmpv-dev portaudio19-dev python3-pyaudio python3-evdev gcc g++ python3-dev python3.11-dev dbus libdbus-1-dev python3-dbus
+    elif command -v dnf &> /dev/null; then
+        echo "Installing additional packages for dnf-based system"
+        sudo dnf update -y
+        sudo dnf install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python-pyaudio python3-evdev gcc g++ python3-devel python3.11-devel dbus python3-dbus
+    elif command -v yum &> /dev/null; then
+        echo "Installing additional packages for yum-based system"
+        sudo yum update -y
+        sudo yum install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python-pyaudio python3-evdev gcc gcc-c++ python3-devel python3.11-devel dbus python3-dbus
+    elif command -v pacman &> /dev/null; then
+        echo "Installing additional packages for pacman-based system"
+        sudo pacman -Sy --noconfirm mpv portaudio python-pyaudio python-evdev gcc gcc-libs python python-devel dbus python-dbus
+        # Note: Arch package names might differ, adjust if needed.
+    elif command -v zypper &> /dev/null; then
+        echo "Installing additional packages for zypper-based system"
+        sudo zypper refresh
+        sudo zypper install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python3-evdev gcc gcc-c++ python3-devel python3.11-devel dbus python3-dbus
+    else
+        echo "No compatible package manager found. Please install additional packages manually."
         exit 1
     fi
 }
@@ -38,34 +65,15 @@ install_requirements() {
     cd "$DIR" || exit
     python3.11 -m venv venv
     source venv/bin/activate
+    python3.11 -m ensurepip
     pip install -U pip setuptools wheel
 
-    requirements=(
-        "ytmusicapi==1.8.2"
-        "yt-dlp==2024.10.7"
-        "icalendar==6.0.1"
-        "python-vlc==3.0.21203"
-        "curl_cffi~=0.7.3"
-        "numpy==1.26.4"
-        "g4f~=0.3.2.7"
-        "playsound<=1.3.0"
-        "flet~=0.25.0.dev3519"
-        "pyautogui~=0.9.54"
-        "PyAudio~=0.2.14"
-        "vosk~=0.3.45"
-        "voicesynth~=0.2.2.post3"
-        "PyYAML~=6.0.2"
-        "requests~=2.32.3"
-        "num2words~=0.5.13"
-        "matplotlib~=3.9.2"
-        "pynput~=1.7.7"
-        "plyer~=2.1.0"
-    )
-
-    # Loop through each package in the list and install it
-    for package in "${requirements[@]}"; do
-        pip install "$package"
-    done
+    if [[ -f requirements.txt ]]; then
+        pip install -r requirements.txt
+    else
+        echo "requirements.txt not found in $DIR"
+        return 1
+    fi
 
     pip install torch==2.2.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 }
@@ -90,5 +98,8 @@ else
     fi
 fi
 
-# Step 2: If Python 3.11 is installed, proceed with installing requirements
+# Install additional system packages required for your dependencies
+install_additional_packages
+
+# Step 2: If Python 3.11 is installed, proceed with installing Python requirements
 install_requirements

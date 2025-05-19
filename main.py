@@ -5,21 +5,20 @@ import requests
 import threading
 import subprocess
 import concurrent.futures
-
 import flet as ft
 
 
 class StewartInstaller:
-    GITHUB_URL = "https://github.com/ilyamiro/stewart"
+    GITHUB_URL = "https://github.com/ilyamiro/stewart.git"
     PURPLE = "#6736FD"
 
     def __init__(self):
-        self.installation_folder = ""
+        self.installation_folder = os.path.expanduser('~')
 
         self.progress_bar = ft.ProgressBar(
-            width=350,
+            width=400,
             color=self.PURPLE,
-            bar_height=5
+            bar_height=10
         )
         self.progress_bar.value = 0
         self.progress_bar.visible = False
@@ -29,22 +28,38 @@ class StewartInstaller:
         self.image = ft.Image(
             src="data/assets/loading.gif",
             fit=ft.ImageFit.CONTAIN,
-            width=390,
-            height=390
+            width=450,
+            height=450
+        )
+
+        self.run_button = ft.TextButton(
+            icon=ft.Icons.START,
+            icon_color="white",
+            text="Launch",
+            scale=1.5,
+            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=25),
+            on_click=self.launch
         )
 
         self.install_button = ft.TextButton(
-            icon=ft.icons.INSTALL_DESKTOP,
+            icon=ft.Icons.INSTALL_DESKTOP,
             icon_color="white",
             text="Install",
-            scale=1.3,
-            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=24),
+            scale=1.5,
+            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=25),
             on_click=self.install
         )
 
         self.pick_dir_button = ft.IconButton(
-            icon=ft.icons.FOLDER_ROUNDED, icon_size=25, icon_color="white",
+            icon=ft.Icons.FOLDER_ROUNDED, icon_size=34, icon_color="white",
             on_click=self.file_pick, bgcolor=self.PURPLE
+        )
+
+    def launch(self, e):
+        subprocess.Popen(
+            ["bash", "data/scripts/launch.sh", self.installation_folder],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
     def file_pick(self, e):
@@ -55,7 +70,7 @@ class StewartInstaller:
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         directory = result.stdout.decode('utf-8').strip()
 
-        self.overview.value = f"**{directory}**"
+        self.overview.value = f"Chosen install directory: **{directory}**"
         self.overview.update()
         self.installation_folder = directory
 
@@ -124,7 +139,7 @@ class StewartInstaller:
             os.mkdir(path)
 
             process = subprocess.Popen(
-                ["git", "clone", "-b", "master", "--progress", self.GITHUB_URL, path],
+                ["git", "clone", "-b", "development", "--progress", self.GITHUB_URL, path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 universal_newlines=True,
@@ -135,7 +150,7 @@ class StewartInstaller:
                 if "Receiving objects" in line:
                     try:
                         progress = int(line.split("%")[0].split()[-1])
-                        self.progress_bar.value = 0.20 + progress * 0.005
+                        self.progress_bar.value = 0.20 + progress * 0.0025
                         self.progress_bar.update()
 
                         self.info(f"Cloning GitHub repository. Progress: **{progress}%**")
@@ -159,8 +174,8 @@ class StewartInstaller:
         """
         Run the installation script for Python3.11
         """
-        self.info("Running **python3.11** installation script...")
-        self.increase_progress(5)
+        self.info("Running additional packages installation script...")
+        self.increase_progress(15)
 
         process = subprocess.Popen(
             ["bash", "data/scripts/install_python.sh", path],
@@ -184,8 +199,8 @@ class StewartInstaller:
         self.progress_bar.update()
 
     def build_ui(self, page: ft.Page):
-        page.window.height = 600
-        page.window.width = 1024
+        page.window.height = 620
+        page.window.width = 1080
         page.title = "Stewart"
 
         page.add(
