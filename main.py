@@ -6,6 +6,7 @@ import threading
 import subprocess
 import concurrent.futures
 import flet as ft
+import re
 
 
 class StewartInstaller:
@@ -32,21 +33,12 @@ class StewartInstaller:
             height=450
         )
 
-        self.run_button = ft.TextButton(
-            icon=ft.Icons.START,
-            icon_color="white",
-            text="Launch",
-            scale=1.5,
-            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=25),
-            on_click=self.launch
-        )
-
         self.install_button = ft.TextButton(
             icon=ft.Icons.INSTALL_DESKTOP,
             icon_color="white",
             text="Install",
             scale=1.5,
-            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=25),
+            style=ft.ButtonStyle(color="white", bgcolor=self.PURPLE, elevation=4, icon_size=20),
             on_click=self.install
         )
 
@@ -57,7 +49,7 @@ class StewartInstaller:
 
     def launch(self, e):
         subprocess.Popen(
-            ["bash", "data/scripts/launch.sh", self.installation_folder],
+            ["bash", "data/scripts/launch.sh", f"{self.installation_folder}/stewart"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -74,20 +66,29 @@ class StewartInstaller:
         self.overview.update()
         self.installation_folder = directory
 
-    def increase_progress(self, percent):
+    def set_progress(self, value, animate=True):
         """
-        Increase progress bar by a given percent.
+        Set progress bar to a specific value with optional smooth animation.
         """
+        if animate and self.progress_bar.value < value:
+            def smooth_progress():
+                start_value = self.progress_bar.value
+                steps = 30
+                increment = (value - start_value) / steps
 
-        def count():
-            current = self.progress_bar.value
-            for i in range(1, percent + 1):
-                self.progress_bar.value = current + i * 0.01
-                time.sleep(0.15)
+                for i in range(steps):
+                    self.progress_bar.value = start_value + (increment * (i + 1))
+                    time.sleep(0.03)
+                    self.progress_bar.update()
+
+                self.progress_bar.value = value
                 self.progress_bar.update()
 
-        thread = threading.Thread(target=count)
-        thread.start()
+            thread = threading.Thread(target=smooth_progress)
+            thread.start()
+        else:
+            self.progress_bar.value = value
+            self.progress_bar.update()
 
     def info(self, value):
         self.overview.value = value
@@ -120,23 +121,33 @@ class StewartInstaller:
 
     def install(self, e):
         self.progress_bar.visible = True
+        self.set_progress(0)
 
-        self.info("Checking internet connection...")
-        self.increase_progress(10)
+        self.info("🌐 Checking internet connection...")
+        self.set_progress(0.05)
 
         if not self.internet_connection():
-            self.info("No internet connection. Try again later.")
+            self.info("❌ No internet connection. Try again later.")
             return
 
-        self.info("Internet connection established. Proceeding...")
-        time.sleep(0.5)
+        self.info("✅ Internet connection established. Proceeding...")
+        self.set_progress(0.10)
 
         try:
             path = os.path.join(self.installation_folder, "stewart")
 
-            self.info("Cloning GitHub repository. Progress: 0%")
+            self.info("📦 Preparing installation directory...")
+            self.set_progress(0.15)
+
+            if os.path.exists(path):
+                self.info("📁 Directory already exists, cleaning up...")
+                import shutil
+                shutil.rmtree(path)
 
             os.mkdir(path)
+            self.set_progress(0.20)
+
+            self.info("🔄 Cloning repository from GitHub...")
 
             process = subprocess.Popen(
                 ["git", "clone", "-b", "development", "--progress", self.GITHUB_URL, path],
@@ -150,58 +161,123 @@ class StewartInstaller:
                 if "Receiving objects" in line:
                     try:
                         progress = int(line.split("%")[0].split()[-1])
-                        self.progress_bar.value = 0.20 + progress * 0.0025
-                        self.progress_bar.update()
+                        # Map git progress (0-100%) to our progress range (20-45%)
+                        progress_value = 0.20 + (progress * 0.0025)
+                        self.set_progress(progress_value, animate=False)
 
-                        self.info(f"Cloning GitHub repository. Progress: **{progress}%**")
-                    except IndexError:
+                        self.info(f"📥 Downloading repository... **{progress}%**")
+                    except (IndexError, ValueError):
                         pass
 
             process.wait()
 
             if process.returncode == 0:
-                self.info("Repository cloned successfully.")
-
+                self.info("✅ Repository cloned successfully.")
+                self.set_progress(0.45)
             else:
-                self.info("Error during cloning. Try again.")
+                self.info("❌ Error during cloning. Try again.")
                 return
 
             self.run_installation_script(path)
         except Exception as err:
-            self.info(f"Error: {err}")
+            self.info(f"❌ Error: {err}")
 
     def run_installation_script(self, path):
         """
-        Run the installation script for Python3.11
+        Run the installation script for Python3.11 with filtered output
         """
-        self.info("Running additional packages installation script...")
-        self.increase_progress(15)
+        self.info("🐍 Checking Python 3.11 installation...")
+        self.set_progress(0.50)
 
         process = subprocess.Popen(
-            ["bash", "data/scripts/install_python.sh", path],
+            ["bash", "data/scripts/install.sh", path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             bufsize=1
         )
 
+        # Track installation stages
+        current_stage = "python_check"
+        progress_stages = {
+            "python_check": 0.50,
+            "python_install": 0.60,
+            "packages_install": 0.75,
+            "venv_setup": 0.85,
+            "requirements_install": 0.95,
+            "complete": 1.0
+        }
+
         for line in process.stdout:
-            self.info(line)
+            line = line.strip()
+
+            # Filter and display relevant installation messages
+            if "Python 3.11 is already installed" in line:
+                self.info("✅ Python 3.11 already installed")
+                current_stage = "packages_install"
+                self.set_progress(progress_stages[current_stage])
+
+            elif "Python 3.11 not found" in line:
+                self.info("📦 Installing Python 3.11...")
+                current_stage = "python_install"
+                self.set_progress(progress_stages[current_stage])
+
+            elif "Detected apt" in line or "Detected dnf" in line or "Detected yum" in line or "Detected pacman" in line or "Detected zypper" in line:
+                pkg_manager = line.split("(")[1].split(")")[0] if "(" in line else "system packages"
+                self.info(f"🔧 Installing system packages using {pkg_manager}...")
+
+            elif "Installing additional packages" in line:
+                self.info("⚙️ Installing additional system dependencies...")
+                current_stage = "packages_install"
+                self.set_progress(progress_stages[current_stage])
+
+            elif "python3.11 -m venv venv" in line or "Creating virtual environment" in line:
+                self.info("🏗️ Setting up Python virtual environment...")
+                current_stage = "venv_setup"
+                self.set_progress(progress_stages[current_stage])
+
+            elif "pip install -r requirements.txt" in line or "Installing requirements" in line:
+                self.info("📋 Installing Python requirements...")
+                current_stage = "requirements_install"
+                self.set_progress(progress_stages[current_stage])
+
+            elif "Successfully installed" in line:
+                # Extract package names from pip success messages
+                packages = re.findall(r'Successfully installed (.+)', line)
+                if packages:
+                    package_list = packages[0].replace('-', ' ').split()[:10]  # Show first 3 packages
+                    self.info(f"✅ Installed packages: {', '.join(package_list)} and others...")
+
+            elif "Collecting" in line and "pip" not in line.lower():
+                # Show when collecting major packages
+                package = line.replace("Collecting ", "").split()[0]
+                # if any(pkg in package.lower() for pkg in ['torch', 'numpy', 'requests', 'flet', 'dotenv',]):
+                self.info(f"📦 Installing package: **{package}**")
 
         process.wait()
 
-        if process.returncode == 0:
-            self.info("**Installation completed successfully.**\n")
-        else:
-            self.info("There was an error during installation. Try again.")
+        self.install_button.icon = ft.Icons.START
+        self.install_button.text = "Launch"
+        self.install_button.on_click = self.launch
 
-        self.progress_bar.value = 1
-        self.progress_bar.update()
+        self.install_button.update()
+
+        if process.returncode == 0:
+            self.info("**Installation completed successfully**")
+            current_stage = "complete"
+        else:
+            self.info("❌ There was an error during installation. Please try again.")
+
+        self.set_progress(progress_stages.get(current_stage, 1.0))
+
+    def exit(self):
+        os.kill(os.getpid(), signal.SIGKILL)
 
     def build_ui(self, page: ft.Page):
         page.window.height = 620
         page.window.width = 1080
         page.title = "Stewart"
+        page.on_close = self.exit
 
         page.add(
             ft.Column(
