@@ -68,7 +68,7 @@ install_python() {
 install_additional_packages() {
     if command -v apt &> /dev/null; then
         echo "Installing additional packages for apt-based system"
-        pkexec bash -c 'apt update -qq && apt install -y mpv libmpv-dev portaudio19-dev python3-pyaudio python3-evdev gcc g++ python3-dev dbus libdbus-1-dev python3-dbus' 2>/dev/null
+        pkexec bash -c 'apt update -qq && apt install -y mpv libmpv-dev portaudio19-dev python3-evdev gcc g++ python3-dev dbus libdbus-1-dev python3-dbus' 2>/dev/null
     elif command -v dnf &> /dev/null; then
         echo "Installing additional packages for dnf-based system"
         pkexec bash -c 'dnf update -y -q && dnf install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python-pyaudio python3-evdev gcc g++ python3-devel python3.11-devel dbus python3-dbus' 2>/dev/null
