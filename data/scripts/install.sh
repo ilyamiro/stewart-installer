@@ -2,6 +2,39 @@
 
 DIR=$1
 
+ensure_polkit_agent() {
+    if pgrep -f polkit-gnome-authentication-agent-1 > /dev/null || \
+       pgrep -f lxqt-policykit-agent > /dev/null || \
+       pgrep -f polkit-kde-authentication-agent-1 > /dev/null; then
+        echo "Polkit agent already running."
+        return
+    fi
+
+    echo "No polkit agent detected. Attempting to install and start one..."
+
+    if command -v apt &> /dev/null; then
+        pkexec bash -c 'apt update -qq && apt install -y policykit-1-gnome'
+        /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
+    elif command -v dnf &> /dev/null; then
+        pkexec bash -c 'dnf install -y polkit-gnome'
+        /usr/libexec/polkit-gnome-authentication-agent-1 &
+    elif command -v yum &> /dev/null; then
+        pkexec bash -c 'yum install -y polkit-gnome'
+        /usr/libexec/polkit-gnome-authentication-agent-1 &
+    elif command -v pacman &> /dev/null; then
+        pkexec bash -c 'pacman -Sy --noconfirm polkit-gnome'
+        /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+    elif command -v zypper &> /dev/null; then
+        pkexec bash -c 'zypper install -y polkit-gnome'
+        /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 &
+    else
+        echo "No supported package manager found to install a polkit agent."
+        exit 1
+    fi
+
+    sleep 2  # Give the agent a moment to start
+}
+
 is_installed_python() {
     if command -v python3.11 &> /dev/null; then
         return 0
@@ -44,7 +77,8 @@ install_additional_packages() {
         pkexec bash -c 'yum update -y -q && yum install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python-pyaudio python3-evdev gcc gcc-c++ python3-devel python3.11-devel dbus python3-dbus' 2>/dev/null
     elif command -v pacman &> /dev/null; then
         echo "Installing additional packages for pacman-based system"
-        pkexec bash -c 'pacman -Sy --noconfirm mpv portaudio python-pyaudio python-evdev gcc gcc-libs python python-devel dbus python-dbus' 2>/dev/null
+        pkexec bash -c 'yay -S python311' 2>/dev/null
+        pkexec bash -c 'pacman -Sy --noconfirm portaudio python-pyaudio python-evdev gcc gcc-libs dbus python-dbus' 2>/dev/null
     elif command -v zypper &> /dev/null; then
         echo "Installing additional packages for zypper-based system"
         pkexec bash -c 'zypper refresh -q && zypper install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python3-evdev gcc gcc-c++ python3-devel python3.11-devel dbus python3-dbus' 2>/dev/null
@@ -66,8 +100,6 @@ install_requirements() {
 
     if [[ -f requirements.txt ]]; then
         echo "Installing requirements"
-
-        # Install requirements with selective output
         pip install -r requirements.txt --progress-bar off 2>&1 | while IFS= read -r line; do
             if [[ $line == *"Collecting"* ]]; then
                 package=$(echo "$line" | sed 's/Collecting //' | cut -d' ' -f1)
@@ -93,7 +125,8 @@ install_requirements() {
     done
 }
 
-# Check if Python 3.11 is installed
+ensure_polkit_agent
+
 is_installed_python
 is_python_installed=$?
 
@@ -103,7 +136,6 @@ else
     echo "Python 3.11 not found. Attempting to install..."
     install_python
 
-    # Re-check after installation
     is_installed_python
     is_python_installed=$?
 
@@ -113,10 +145,7 @@ else
     fi
 fi
 
-# Install additional system packages required for your dependencies
 install_additional_packages
-
-# Step 2: If Python 3.11 is installed, proceed with installing Python requirements
 install_requirements
 
 echo "Installation process completed"
