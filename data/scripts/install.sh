@@ -77,7 +77,6 @@ install_additional_packages() {
         pkexec bash -c 'yum update -y -q && yum install -y mpv-devel mpv portaudio-devel portaudio python3-pyaudio python-pyaudio python3-evdev gcc gcc-c++ python3-devel python3.11-devel dbus python3-dbus' 2>/dev/null
     elif command -v pacman &> /dev/null; then
         echo "Installing additional packages for pacman-based system"
-        pkexec bash -c 'yay -S python311' 2>/dev/null
         pkexec bash -c 'pacman -Sy --noconfirm portaudio python-pyaudio python-evdev gcc gcc-libs dbus python-dbus' 2>/dev/null
     elif command -v zypper &> /dev/null; then
         echo "Installing additional packages for zypper-based system"
