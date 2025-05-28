@@ -34,66 +34,54 @@ if [[ ! -f "$DIR/main.py" ]]; then
     exit 1
 fi
 
-# RESERVED
-#create_desktop_entry() {
-#    local desktop_file_name="stewart.desktop"
-#    local desktop_file_path="$HOME/.local/share/applications/$desktop_file_name"
-#    local icon_path="$DIR/data/images/stewart.png"
-#    local exec_path="$DIR/launch.sh"
-#
-#    # Ensure applications directory exists
-#    mkdir -p "$HOME/.local/share/applications"
-#
-#    # Create the .desktop file
-#    cat > "$desktop_file_path" <<EOF
-#[Desktop Entry]
-#Name=Stewart
-#GenericName=Voice Assistant
-#Comment=Useful voice assistant
-#Exec=$exec_path
-#Icon=$icon_path
-#Terminal=true
-#Type=Application
-#Categories=Utility;Application;
-#EOF
-#
-#    # Make it executable
-#    chmod +x "$desktop_file_path"
-#
-#    echo "Desktop shortcut created at: $desktop_file_path"
-#}
+desktop_entry() {
+    local desktop_file_name="stewart.desktop"
+    local desktop_entry_name="stewart"
+    local desktop_file_path="$HOME/.local/share/applications/$desktop_file_name"
+    local icon_path="$DIR/data/images/stewart.png"
+    local exec_path="$DIR/scripts/launch.sh $DIR"
 
-launch_in_terminal() {
-    CMD="cd '$DIR' && source venv/bin/activate && python3.11 main.py; exec bash"
+    mkdir -p "$HOME/.local/share/applications"
 
-    declare -A terminals=(
-        [gnome-terminal]="-- bash -c \"$CMD\""
-        [konsole]="--noclose -e bash -c \"$CMD\""
-        [xfce4-terminal]="--command=\"bash -c '$CMD'\""
-        [tilix]="-e bash -c \"$CMD\""
-        [kitty]="bash -c \"$CMD\""
-        [alacritty]="-e bash -c \"$CMD\""
-        [wezterm]="start -- bash -c \"$CMD\""
-        [lxterminal]="-e bash -c \"$CMD\""
-        [terminator]="-x bash -c \"$CMD\""
-        [mate-terminal]="-- bash -c \"$CMD\""
-        [urxvt]="-e bash -c \"$CMD\""
-        [st]="-e bash -c \"$CMD\""
-        [xterm]="-hold -e bash -c \"$CMD\""
-        [x-terminal-emulator]="-e bash -c \"$CMD\""
-    )
+    cat > "$desktop_file_path" <<EOF
+[Desktop Entry]
+Name=Stewart
+GenericName=Voice Assistant
+Comment=Useful voice assistant
+Exec=$exec_path
+Icon=$icon_path
+Terminal=true
+Type=Application
+Categories=Utility;Application;
+EOF
 
-    for term in "${!terminals[@]}"; do
-        if command -v "$term" &> /dev/null; then
-            eval "$term ${terminals[$term]}" &
-            return
-        fi
-    done
+    chmod +x "$desktop_file_path"
+    echo "Desktop shortcut created at: $desktop_file_path"
 
-    echo "No supported terminal emulator found. Running in current shell."
-    cd "$DIR"
-    source venv/bin/activate
-    python3.11 main.py
+    echo "Attempting to launch the desktop entry..."
+
+    # Try gtk-launch
+    if command -v gtk-launch &> /dev/null; then
+        gtk-launch "$desktop_entry_name" && return
+    fi
+
+    # Try dbus-send (GNOME only)
+    if command -v dbus-send &> /dev/null; then
+        dbus-send --session --dest=org.freedesktop.Application.$desktop_entry_name \
+            /org/freedesktop/Application/$desktop_entry_name \
+            org.freedesktop.Application.Activate \
+            &> /dev/null && return
+    fi
+
+    if command -v xdg-open &> /dev/null; then
+        xdg-open "$desktop_file_path" && return
+    fi
+
+    if command -v gio &> /dev/null; then
+        gio open "$desktop_file_path" && return
+    fi
+
+    echo "Warning: Could not automatically launch Stewart. Please run it manually from your applications menu."
 }
 
-launch_in_terminal
+desktop_entry
