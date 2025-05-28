@@ -65,20 +65,20 @@ EOF
         gtk-launch "$desktop_entry_name" && return
     fi
 
-    # Try dbus-send (GNOME only)
-    if command -v dbus-send &> /dev/null; then
-        dbus-send --session --dest=org.freedesktop.Application.$desktop_entry_name \
-            /org/freedesktop/Application/$desktop_entry_name \
-            org.freedesktop.Application.Activate \
-            &> /dev/null && return
-    fi
-
     if command -v xdg-open &> /dev/null; then
         xdg-open "$desktop_file_path" && return
     fi
 
     if command -v gio &> /dev/null; then
         gio open "$desktop_file_path" && return
+    fi
+
+     # Try dbus-send (GNOME only)
+    if command -v dbus-send &> /dev/null; then
+        dbus-send --session --dest=org.freedesktop.Application.$desktop_entry_name \
+            /org/freedesktop/Application/$desktop_entry_name \
+            org.freedesktop.Application.Activate \
+            &> /dev/null && return
     fi
 
     echo "Warning: Could not automatically launch Stewart. Please run it manually from your applications menu."

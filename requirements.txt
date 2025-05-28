@@ -1,2 +1,3 @@
-requests
-flet
+PyYAML~=6.0.2
+requests>=2.32.3
+flet>=0.28.3

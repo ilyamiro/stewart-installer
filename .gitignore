@@ -1,2 +1,8 @@
 .idea
 venv
+
+commit.txt
+commit-ru.txt
+
+
+data/scripts/post_commit.session
