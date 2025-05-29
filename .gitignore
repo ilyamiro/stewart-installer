@@ -2,7 +2,7 @@
 venv
 
 commit.txt
-commit-ru.txt
-
+commit_ru.txt
 
 data/scripts/post_commit.session
+.updater.json
