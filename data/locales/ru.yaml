@@ -1,5 +1,7 @@
 install: "Установить"
 update: "Обновить"
+update-fail: "Обновление провалилось: \n{error}"
+update-successful: "Обновление прошло успешно: \n{result.stdout}"
 found-no-install: "**Стюарт** не был обнаружен: нажмите **Установить**."
 found-install: "Версия **Стюарт** актуальна: **{local_version}**"
 update-from: "Обновить с **{local_version}** до **{remote_version}**"

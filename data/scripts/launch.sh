@@ -39,7 +39,47 @@ desktop_entry() {
     local desktop_entry_name="stewart"
     local desktop_file_path="$HOME/.local/share/applications/$desktop_file_name"
     local icon_path="$DIR/data/images/stewart.png"
-    local exec_path="$DIR/scripts/launch.sh $DIR"
+
+    local base_cmd="cd '$DIR' && source venv/bin/activate && python3.11 main.py; exec bash"
+
+    local exec_path=""
+
+    declare -A terminals=(
+        [gnome-terminal]="gnome-terminal -- bash -c \"$base_cmd\""
+        [gnome-console]="gnome-console -- bash -c \"$base_cmd\""
+        [kgx]="kgx -- bash -c \"$base_cmd\""
+        [konsole]="konsole --noclose -e bash -c \"$base_cmd\""
+        [xfce4-terminal]="xfce4-terminal --command=\"bash -c '$base_cmd'\""
+        [tilix]="tilix -e bash -c \"$base_cmd\""
+        [kitty]="kitty bash -c \"$base_cmd\""
+        [alacritty]="alacritty -e bash -c \"$base_cmd\""
+        [wezterm]="wezterm start -- bash -c \"$base_cmd\""
+        [lxterminal]="lxterminal -e bash -c \"$base_cmd\""
+        [terminator]="terminator -x bash -c \"$base_cmd\""
+        [mate-terminal]="mate-terminal -- bash -c \"$base_cmd\""
+        [urxvt]="urxvt -e bash -c \"$base_cmd\""
+        [st]="st -e bash -c \"$base_cmd\""
+        [xterm]="xterm -hold -e bash -c \"$base_cmd\""
+        [x-terminal-emulator]="x-terminal-emulator -e bash -c \"$base_cmd\""
+    )
+
+    local found_terminal=""
+    for term in "${!terminals[@]}"; do
+        if command -v "$term" &> /dev/null; then
+            found_terminal="$term"
+            break
+        fi
+    done
+
+    # Set exec_path based on available terminal
+    if [[ -n "$found_terminal" ]]; then
+        exec_path="${terminals[$found_terminal]}"
+        echo "Using terminal: $found_terminal"
+    else
+        # Fallback to running in current shell context
+        exec_path="bash -c \"cd '$DIR' && source venv/bin/activate && python3.11 main.py; exec bash\""
+        echo "No supported terminal found, using fallback execution"
+    fi
 
     mkdir -p "$HOME/.local/share/applications"
 
@@ -52,11 +92,11 @@ Exec=$exec_path
 Icon=$icon_path
 Terminal=true
 Type=Application
-Categories=Utility;Application;
 EOF
 
     chmod +x "$desktop_file_path"
-    echo "Desktop shortcut created at: $desktop_file_path"
+    echo "Desktop shortcut created or updated at: $desktop_file_path"
+    echo "Exec command: $exec_path"
 
     echo "Attempting to launch the desktop entry..."
 
@@ -73,7 +113,6 @@ EOF
         gio open "$desktop_file_path" && return
     fi
 
-     # Try dbus-send (GNOME only)
     if command -v dbus-send &> /dev/null; then
         dbus-send --session --dest=org.freedesktop.Application.$desktop_entry_name \
             /org/freedesktop/Application/$desktop_entry_name \
@@ -83,5 +122,6 @@ EOF
 
     echo "Warning: Could not automatically launch Stewart. Please run it manually from your applications menu."
 }
+
 
 desktop_entry

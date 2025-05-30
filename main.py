@@ -458,6 +458,7 @@ class StewartInstaller:
 
         self.localizer = Localizer(get_system_language())
         self.installation_folder = os.path.expanduser('~')
+        self.existing_installation_folder = None
         self.page = None
 
         self.network_manager = NetworkManager()
@@ -498,6 +499,7 @@ class StewartInstaller:
 
         self.local_version = version_info["version"]
         self.remote_version = remote_version
+        self.existing_installation_folder = version_info["path"]
 
         if remote_version != version_info["version"]:
             self._handle_update_available(version_info, remote_version)
@@ -530,6 +532,15 @@ class StewartInstaller:
         self.ui_components.app_bar_file_pick.update()
 
     def _handle_current_installation(self, version_info):
+        self.ui_components.update_button.disabled = False
+        self.ui_components.update_button.opacity = 1.0
+        self.ui_components.update_button.style.text_style = None
+        self.ui_components.update_button.text = self.localizer.translate("launch")
+        self.ui_components.update_button.icon = ft.Icons.OPEN_IN_BROWSER
+        self.ui_components.update_button.on_click = self.launch
+
+        self.ui_components.update_button.update()
+
         self.ui_components.app_bar_file_pick.value = version_info["path"]
         self.ui_components.app_bar_file_pick.update()
 
@@ -554,10 +565,10 @@ class StewartInstaller:
             result = self.git_manager.pull_updates(install_path)
             self.version_manager.update_version_file(str(install_path), e.control.data[0])
 
-            self._update_info(f"Update successful:\n{result.stdout}")
+            self._update_info(self.localizer.translate("update-successful", result=result.stdout))
 
         except subprocess.CalledProcessError as err:
-            self._update_info(f"Update failed:\n{err.stderr}")
+            self._update_info(self.localizer.translate("update-fail", error=err.stderr))
 
     def change_locale(self, e):
         if self.installing:
@@ -576,18 +587,19 @@ class StewartInstaller:
 
     def _update_ui_text(self):
         self.ui_components.install_button.text = self.localizer.translate("install")
-        self.ui_components.update_button.text = self.localizer.translate("update")
 
         if self.no_detect:
             self.ui_components.overview.value = self.localizer.translate("found-no-install")
         else:
             if self.update_exists:
+                self.ui_components.update_button.text = self.localizer.translate("update")
                 self.ui_components.overview.value = self.localizer.translate(
                     "update-from",
                     local_version=self.local_version,
                     remote_version=self.remote_version
                 )
             else:
+
                 self.ui_components.overview.value = self.localizer.translate(
                     "found-install",
                     local_version=self.local_version
@@ -600,7 +612,7 @@ class StewartInstaller:
 
     def launch(self, e):
         subprocess.Popen(
-            ["bash", "data/scripts/launch.sh", f"{self.installation_folder}/stewart"],
+            ["bash", f"{PROJECT_DIR}/data/scripts/launch.sh", self.existing_installation_folder],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -627,6 +639,13 @@ class StewartInstaller:
         self._start_installation()
 
     def _start_installation(self):
+        self.ui_components.update_button.disabled = True
+        self.ui_components.update_button.opacity = 0.4
+        self.ui_components.update_button.icon = ft.Icons.UPDATE
+        self.ui_components.update_button.text = self.localizer.translate("update"),
+        self.ui_components.update_button.style.text_style = None
+        self.ui_components.update_button.update()
+
         self.installing = True
         self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/loading.gif"
         self.ui_components.image.update()
@@ -724,10 +743,12 @@ class StewartInstaller:
 
         self.version_manager.write_install_info(data)
 
-        self.ui_components.install_button.icon = ft.Icons.START
+        self.ui_components.install_button.icon = ft.Icons.OPEN_IN_BROWSER
         self.ui_components.install_button.text = self.localizer.translate("launch")
         self.ui_components.install_button.on_click = self.launch
         self.ui_components.install_button.update()
+
+        self.installing = False
 
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
