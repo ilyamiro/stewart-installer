@@ -765,6 +765,7 @@ class StewartInstaller:
     def _configure_page(self):
         self.page.window.height = 680
         self.page.window.width = 1080
+        self.page.theme_mode = ft.ThemeMode.DARK
         self.page.title = "Stewart"
         self.page.appbar = self.ui_components.appbar
 
