@@ -91,6 +91,9 @@ def get_commit_changes(commit_hash):
 def main():
     commit_info = get_commit_info()
 
+    if not commit_info["message"][0].startswith("-"):
+        return
+
     changes = get_commit_changes(commit_info['hash'])
 
     telegram_message = build_telegram_message(commit_info, changes)

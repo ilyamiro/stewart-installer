@@ -642,7 +642,7 @@ class StewartInstaller:
         self.ui_components.update_button.disabled = True
         self.ui_components.update_button.opacity = 0.4
         self.ui_components.update_button.icon = ft.Icons.UPDATE
-        self.ui_components.update_button.text = self.localizer.translate("update"),
+        self.ui_components.update_button.text = self.localizer.translate("update")
         self.ui_components.update_button.style.text_style = None
         self.ui_components.update_button.update()
 
@@ -742,13 +742,10 @@ class StewartInstaller:
         }
 
         self.version_manager.write_install_info(data)
-
-        self.ui_components.install_button.icon = ft.Icons.OPEN_IN_BROWSER
-        self.ui_components.install_button.text = self.localizer.translate("launch")
-        self.ui_components.install_button.on_click = self.launch
-        self.ui_components.install_button.update()
-
+        
         self.installing = False
+        
+        self._find_existing_installation()
 
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
