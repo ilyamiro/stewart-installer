@@ -518,6 +518,7 @@ class StewartInstaller:
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
         self.ui_components.update_button.style.text_style = None
+        self.ui_components.update_button.on_click = self.update
         self.ui_components.update_button.data = (remote_version, version_info["path"])
         self.ui_components.update_button.update()
 
@@ -593,6 +594,7 @@ class StewartInstaller:
         else:
             if self.update_exists:
                 self.ui_components.update_button.text = self.localizer.translate("update")
+                self.ui_components.update_button.update()
                 self.ui_components.overview.value = self.localizer.translate(
                     "update-from",
                     local_version=self.local_version,
