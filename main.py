@@ -160,9 +160,9 @@ class VersionManager:
         )
 
         changed_files = result.stdout.strip().split("\n")
-        included_dirs = ("core/", "custom/", "gpt/", "config/")
+        excluded_dirs = ("plugins/core/", "plugins/custom/", "plugins/gpt/", "config/")
         relevant_changes = [
-            f for f in changed_files if any(f.startswith(d) for d in included_dirs)
+            f for f in changed_files if not any(f.startswith(d) for d in excluded_dirs)
         ]
 
         return bool(relevant_changes)
@@ -769,9 +769,9 @@ class StewartInstaller:
         }
 
         self.version_manager.write_install_info(data)
-        
+
         self.installing = False
-        
+
         self._find_existing_installation()
 
         if process.returncode == 0:
