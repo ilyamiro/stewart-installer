@@ -1,5 +1,6 @@
 install: "Install"
 update: "Update"
+bugfix: "Update to download bugfixes for version **{local_version}**"
 launch: "Launch"
 update-fail: "Update failed:\n{error}"
 update-successful: "Update successful: \n{result}"

@@ -150,6 +150,24 @@ class GitManager:
 
 class VersionManager:
     @staticmethod
+    def has_relevant_updates(path):
+        subprocess.run(["git", "fetch"], cwd=path, check=True)
+
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD", "origin/development"],
+            cwd=path,
+            capture_output=True, text=True, check=True
+        )
+
+        changed_files = result.stdout.strip().split("\n")
+        included_dirs = ("core/", "custom/", "gpt/", "config/")
+        relevant_changes = [
+            f for f in changed_files if any(f.startswith(d) for d in included_dirs)
+        ]
+
+        return bool(relevant_changes)
+
+    @staticmethod
     def get_local_version_info(installed_file):
         if not os.path.exists(installed_file):
             return None
@@ -501,7 +519,7 @@ class StewartInstaller:
         self.remote_version = remote_version
         self.existing_installation_folder = version_info["path"]
 
-        if remote_version != version_info["version"]:
+        if remote_version != version_info["version"] or self.version_manager.has_relevant_updates(version_info["path"]):
             self._handle_update_available(version_info, remote_version)
         else:
             self._handle_current_installation(version_info)
@@ -522,11 +540,18 @@ class StewartInstaller:
         self.ui_components.update_button.data = (remote_version, version_info["path"])
         self.ui_components.update_button.update()
 
-        self.ui_components.overview.value = self.localizer.translate(
-            "update-from",
-            local_version=version_info["version"],
-            remote_version=remote_version
-        )
+        if version_info != remote_version:
+            self.ui_components.overview.value = self.localizer.translate(
+                "update-from",
+                local_version=version_info["version"],
+                remote_version=remote_version
+            )
+        else:
+            self.ui_components.overview.value = self.localizer.translate(
+                "bugfix",
+                local_version=version_info["version"],
+            )
+
         self.ui_components.overview.update()
 
         self.ui_components.app_bar_file_pick.value = version_info["path"]
