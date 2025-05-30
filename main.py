@@ -590,18 +590,17 @@ class StewartInstaller:
         self.ui_components.install_button.text = self.localizer.translate("install")
 
         if self.no_detect:
+            self.ui_components.update_button.text = self.localizer.translate("update")
             self.ui_components.overview.value = self.localizer.translate("found-no-install")
         else:
             if self.update_exists:
                 self.ui_components.update_button.text = self.localizer.translate("update")
-                self.ui_components.update_button.update()
                 self.ui_components.overview.value = self.localizer.translate(
                     "update-from",
                     local_version=self.local_version,
                     remote_version=self.remote_version
                 )
             else:
-
                 self.ui_components.overview.value = self.localizer.translate(
                     "found-install",
                     local_version=self.local_version
