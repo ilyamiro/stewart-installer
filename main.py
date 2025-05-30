@@ -462,6 +462,9 @@ class InstallationHandler:
             package = line.replace("Collecting ", "").split()[0]
             self.progress.update_info(self.localizer.translate("install-pkg-sep", package=package))
 
+        elif "torch" in line:
+            self.progress.update_info(self.localizer.translate("install-torch"))
+
         return current_stage
 
 

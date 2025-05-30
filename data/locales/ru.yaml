@@ -1,6 +1,7 @@
 install: "Установить"
 update: "Обновить"
 bugfix: "Обновить для исправления багов и ошибок для версии **{local_version}**"
+install-torch: "Установка библиотеки PyTorch: версия для процессоров"
 update-fail: "Обновление провалилось: \n{error}"
 update-successful: "Обновление прошло успешно: \n{result.stdout}"
 found-no-install: "**Стюарт** не был обнаружен: нажмите **Установить**."
