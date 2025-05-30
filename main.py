@@ -601,6 +601,7 @@ class StewartInstaller:
                     remote_version=self.remote_version
                 )
             else:
+                self.ui_components.update_button.text = self.localizer.translate("launch")
                 self.ui_components.overview.value = self.localizer.translate(
                     "found-install",
                     local_version=self.local_version
