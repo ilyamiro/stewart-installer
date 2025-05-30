@@ -1,8 +1,0 @@
-.idea
-venv
-
-commit.txt
-commit_ru.txt
-
-data/scripts/post_commit.session
-.updater.json

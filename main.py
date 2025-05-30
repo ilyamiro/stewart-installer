@@ -151,16 +151,19 @@ class GitManager:
 class VersionManager:
     @staticmethod
     def has_relevant_updates(path):
-        subprocess.run(["git", "fetch"], cwd=path, check=True)
+        subprocess.run(["git", "fetch", "--all"], cwd=path, check=True)
 
         result = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD", "origin/development"],
+            ["git", "diff", "--name-only", "origin/development", "development"],
             cwd=path,
             capture_output=True, text=True, check=True
         )
 
         changed_files = result.stdout.strip().split("\n")
-        excluded_dirs = ("plugins/core/", "plugins/custom/", "plugins/gpt/", "config/")
+        if changed_files == ['']:
+            changed_files = []
+
+        excluded_dirs = ("plugins/core/", "plugins/custom/", "plugins/gpt/", "config/", "docs/")
         relevant_changes = [
             f for f in changed_files if not any(f.startswith(d) for d in excluded_dirs)
         ]
