@@ -579,7 +579,7 @@ class StewartInstaller:
         self.ui_components.update_button.update()
 
         self.ui_components.remove_button.disabled = False
-        self.ui_components.update_button.opacity = 1.0
+        self.ui_components.remove_button.opacity = 1.0
         self.ui_components.remove_button.update()
 
         if version_info != remote_version:
