@@ -882,6 +882,8 @@ class StewartInstaller:
         self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
         self.ui_components.image.update()
 
+        self._create_desktop_stewart_shortcut()
+
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
             progress.set_progress(1.0)
@@ -890,9 +892,17 @@ class StewartInstaller:
 
         self._find_existing_installation()
 
-    def _create_desktop_shortcut(self):
+    @staticmethod
+    def _create_desktop_shortcut():
         subprocess.run(
-            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry.sh", self.existing_installation_folder],
+            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry.sh"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    def _create_desktop_stewart_shortcut(self):
+        subprocess.run(
+            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry_stewart.sh", self.existing_installation_folder],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
