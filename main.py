@@ -589,7 +589,7 @@ class StewartInstaller:
         self.ui_components.remove_button.opacity = 1.0
         self.ui_components.remove_button.update()
 
-        if version_info != remote_version:
+        if version_info["version"] != remote_version:
             self.ui_components.overview.value = self.localizer.translate(
                 "update-from",
                 local_version=version_info["version"],
@@ -652,7 +652,7 @@ class StewartInstaller:
             result = self.git_manager.pull_updates(install_path)
             self.version_manager.update_version_file(str(install_path), e.control.data[0])
 
-            self._update_info(self.localizer.translate("update-successful", result=result.stdout))
+            self._update_info(self.localizer.translate("update-successful"))
             self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
             self.ui_components.image.update()
 
@@ -660,9 +660,10 @@ class StewartInstaller:
             self.ui_components.remove_button.opacity = 1.0
             self.ui_components.remove_button.update()
 
+            self._find_existing_installation()
+
         except subprocess.CalledProcessError as err:
             self._update_info(self.localizer.translate("update-fail", error=err.stderr))
-
 
     def change_locale(self, e):
         if self.installing:
