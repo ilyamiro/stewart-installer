@@ -530,6 +530,10 @@ class StewartInstaller:
     def _find_existing_installation(self):
         version_info = self.version_manager.get_local_version_info(INSTALLED_FILE)
 
+        self.ui_components.progress_bar.value = 0
+        self.ui_components.progress_bar.visible = False
+        self.ui_components.progress_bar.update()
+
         if not version_info:
             self._handle_no_installation()
             return
@@ -550,6 +554,12 @@ class StewartInstaller:
     def _handle_no_installation(self):
         self.no_detect = True
         self.ui_components.app_bar_file_pick.value = self.installation_folder
+
+        self.ui_components.update_button.disabled = True
+        self.ui_components.update_button.opacity = 0.4
+        self.ui_components.update_button.text = self.localizer.translate("update")
+        self.ui_components.update_button.icon = ft.Icons.UPDATE
+        self.ui_components.update_button.on_click = self.update
 
         self.ui_components.remove_button.disabled = True
         self.ui_components.remove_button.opacity = 0.4
@@ -591,7 +601,6 @@ class StewartInstaller:
     def _handle_current_installation(self, version_info):
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
-        self.ui_components.update_button.style.text_style = None
         self.ui_components.update_button.text = self.localizer.translate("launch")
         self.ui_components.update_button.icon = ft.Icons.OPEN_IN_BROWSER
         self.ui_components.update_button.on_click = self.launch
