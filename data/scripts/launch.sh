@@ -76,7 +76,6 @@ desktop_entry() {
         exec_path="${terminals[$found_terminal]}"
         echo "Using terminal: $found_terminal"
     else
-        # Fallback to running in current shell context
         exec_path="bash -c \"cd '$DIR' && source venv/bin/activate && python3.11 main.py; exec bash\""
         echo "No supported terminal found, using fallback execution"
     fi

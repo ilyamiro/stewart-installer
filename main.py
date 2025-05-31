@@ -786,10 +786,19 @@ class StewartInstaller:
         else:
             progress.update_info(self.localizer.translate("error-install"))
 
+    @staticmethod
+    def _create_desktop_shortcut():
+        subprocess.run(
+            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry.sh"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
     def build_ui(self, page: ft.Page):
         self.page = page
         self._configure_page()
         self._add_page_content()
+        self._create_desktop_shortcut()
         self._find_existing_installation()
 
     def _configure_page(self):
