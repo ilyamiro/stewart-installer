@@ -491,7 +491,7 @@ class StewartInstaller:
     def __init__(self):
         self.installing = False
         self.update_exists = False
-        self.no_detect = False
+        self.no_detect = True
 
         self.local_version = "___"
         self.remote_version = "___"
@@ -570,6 +570,7 @@ class StewartInstaller:
 
     def _handle_update_available(self, version_info, remote_version):
         self.update_exists = True
+        self.no_detect = False
 
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
@@ -599,6 +600,8 @@ class StewartInstaller:
         self.ui_components.app_bar_file_pick.update()
 
     def _handle_current_installation(self, version_info):
+        self.no_detect = False
+
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
         self.ui_components.update_button.text = self.localizer.translate("launch")
@@ -711,17 +714,30 @@ class StewartInstaller:
         self.start_installation()
 
     def uninstall(self, e):
+        self.ui_components.progress_bar.visible = True
+        progress = InstallationProgress(
+            self.ui_components.progress_bar,
+            self.ui_components.overview
+        )
+        progress.set_progress(0)
+
         if self.existing_installation_folder and os.path.exists(self.existing_installation_folder):
+            progress.set_progress(0.85)
             self._update_info(self.localizer.translate("remove-folder"))
             shutil.rmtree(self.existing_installation_folder)
+            time.sleep(1)
 
         path_to_desktop = f'{os.path.expanduser("~")}/.local/share/applications/stewart.desktop'
         if os.path.exists(path_to_desktop) and (os.path.isfile(path_to_desktop) or os.path.islink(path_to_desktop)):
-            self._update_info(self.localizer.translate("remove-folder"))
+            progress.set_progress(0.925)
+            time.sleep(0.5)
+            self._update_info(self.localizer.translate("remove-desktop"))
             os.remove(path_to_desktop)
 
         path_to_updater = f"{PROJECT_DIR}/.updater.json"
         if os.path.exists(path_to_updater):
+            progress.set_progress(1)
+            time.sleep(0.5)
             os.remove(path_to_updater)
 
         self._update_info(self.localizer.translate("remove-success"))
@@ -833,14 +849,15 @@ class StewartInstaller:
         self.version_manager.write_install_info(data)
 
         self.installing = False
-
-        self._find_existing_installation()
+        self.no_detect = False
 
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
             progress.set_progress(1.0)
         else:
             progress.update_info(self.localizer.translate("error-install"))
+
+        self._find_existing_installation()
 
     @staticmethod
     def _create_desktop_shortcut():

@@ -6,6 +6,7 @@ no-git-path: "Путь {install_path} не имеет директории **.gi
 delete: "Удалить"
 remove-folder: "Удаление папки со Стюартом"
 remove-success: "Стюарт был успешно удален"
+remove-desktop: "Удаление ярлыков для рабочего стола: **.desktop**"
 update-fail: "Обновление провалилось: \n{error}"
 update-successful: "Обновление прошло успешно: \n{result.stdout}"
 found-no-install: "**Стюарт** не был обнаружен: нажмите **Установить**."
