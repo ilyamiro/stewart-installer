@@ -250,6 +250,7 @@ class UIComponents:
         self.overview = None
         self.image = None
         self.install_button = None
+        self.remove_button = None
         self.update_button = None
 
     def create_language_menu(self):
@@ -261,12 +262,13 @@ class UIComponents:
                             src=f"{PROJECT_DIR}/data/assets/languages/{locale}.png",
                             fit=ft.ImageFit.CONTAIN,
                             width=24,
-                            height=16
+                            height=16,
                         ),
                         ft.Text(locale, size=20),
                     ]),
                     on_click=None,
-                    data=locale
+                    data=locale,
+                    padding=4
                 )
             )
 
@@ -352,6 +354,23 @@ class UIComponents:
             on_click=None
         )
 
+        self.remove_button = ft.TextButton(
+            icon=ft.Icons.DELETE,
+            icon_color="white",
+            disabled=True,
+            opacity=0.4,
+            text=self.localizer.translate("delete"),
+            scale=1.5,
+            style=ft.ButtonStyle(
+                padding=10,
+                color="white",
+                bgcolor=PURPLE,
+                elevation=4,
+                icon_size=25
+            ),
+            on_click=None
+        )
+
         self.update_button = ft.TextButton(
             icon=ft.Icons.UPDATE,
             opacity=0.4,
@@ -365,9 +384,6 @@ class UIComponents:
                 bgcolor=PURPLE,
                 elevation=4,
                 icon_size=25,
-                text_style=ft.TextStyle(
-                    decoration=ft.TextDecoration.LINE_THROUGH
-                )
             ),
             on_click=None,
         )
@@ -509,6 +525,7 @@ class StewartInstaller:
         self.ui_components.app_bar_launch_github.on_click = self.launch_github
         self.ui_components.install_button.on_click = self.install
         self.ui_components.update_button.on_click = self.update
+        self.ui_components.remove_button.on_click = self.uninstall
 
     def _find_existing_installation(self):
         version_info = self.version_manager.get_local_version_info(INSTALLED_FILE)
@@ -533,7 +550,12 @@ class StewartInstaller:
     def _handle_no_installation(self):
         self.no_detect = True
         self.ui_components.app_bar_file_pick.value = self.installation_folder
-        self.ui_components.overview.value = self.localizer.translate("found-no-install")
+
+        self.ui_components.remove_button.disabled = True
+        self.ui_components.remove_button.opacity = 0.4
+        self.ui_components.remove_button.update()
+
+        self._update_info(self.localizer.translate("found-no-install"))
         self.page.update()
 
     def _handle_update_available(self, version_info, remote_version):
@@ -541,10 +563,13 @@ class StewartInstaller:
 
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
-        self.ui_components.update_button.style.text_style = None
         self.ui_components.update_button.on_click = self.update
         self.ui_components.update_button.data = (remote_version, version_info["path"])
         self.ui_components.update_button.update()
+
+        self.ui_components.remove_button.disabled = False
+        self.ui_components.update_button.opacity = 1.0
+        self.ui_components.remove_button.update()
 
         if version_info != remote_version:
             self.ui_components.overview.value = self.localizer.translate(
@@ -576,6 +601,10 @@ class StewartInstaller:
         self.ui_components.app_bar_file_pick.value = version_info["path"]
         self.ui_components.app_bar_file_pick.update()
 
+        self.ui_components.remove_button.disabled = False
+        self.ui_components.remove_button.opacity = 1.0
+        self.ui_components.remove_button.update()
+
         self.ui_components.overview.value = self.localizer.translate(
             "found-install",
             local_version=version_info["version"]
@@ -587,7 +616,7 @@ class StewartInstaller:
         git_dir = install_path / ".git"
 
         if not git_dir.exists():
-            self._update_info(f"{install_path} does not have **.git** directory. Update is impossible. Aborting...")
+            self._update_info(self.localizer.translate("no-git-path", install_path=install_path))
             return
 
         try:
@@ -624,6 +653,7 @@ class StewartInstaller:
             self.ui_components.update_button.text = self.localizer.translate("update")
             self.ui_components.overview.value = self.localizer.translate("found-no-install")
         else:
+            self.ui_components.remove_button.text = self.localizer.translate("delete")
             if self.update_exists:
                 self.ui_components.update_button.text = self.localizer.translate("update")
                 self.ui_components.overview.value = self.localizer.translate(
@@ -669,9 +699,26 @@ class StewartInstaller:
 
     def install(self, e):
         self.file_pick()
-        self._start_installation()
+        self.start_installation()
 
-    def _start_installation(self):
+    def uninstall(self, e):
+        if self.existing_installation_folder and os.path.exists(self.existing_installation_folder):
+            self._update_info(self.localizer.translate("remove-folder"))
+            shutil.rmtree(self.existing_installation_folder)
+
+        path_to_desktop = f'{os.path.expanduser("~")}/.local/share/applications/stewart.desktop'
+        if os.path.exists(path_to_desktop) and (os.path.isfile(path_to_desktop) or os.path.islink(path_to_desktop)):
+            self._update_info(self.localizer.translate("remove-folder"))
+            os.remove(path_to_desktop)
+
+        path_to_updater = f"{PROJECT_DIR}/.updater.json"
+        if os.path.exists(path_to_updater):
+            os.remove(path_to_updater)
+
+        self._update_info(self.localizer.translate("remove-success"))
+        self._find_existing_installation()
+
+    def start_installation(self):
         self.ui_components.update_button.disabled = True
         self.ui_components.update_button.opacity = 0.4
         self.ui_components.update_button.icon = ft.Icons.UPDATE
@@ -816,7 +863,7 @@ class StewartInstaller:
                 ft.Row([self.ui_components.overview], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Text(),
                 ft.Row(
-                    [self.ui_components.update_button, self.ui_components.install_button],
+                    [self.ui_components.update_button, self.ui_components.install_button, self.ui_components.remove_button],
                     alignment=ft.MainAxisAlignment.CENTER,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=65,
