@@ -560,6 +560,8 @@ class StewartInstaller:
 
     def _handle_no_installation(self):
         self.no_detect = True
+        self.update_exists = False
+
         self.ui_components.app_bar_file_pick.value = self.installation_folder
 
         self.ui_components.update_button.disabled = True
@@ -589,16 +591,16 @@ class StewartInstaller:
         self.ui_components.remove_button.opacity = 1.0
         self.ui_components.remove_button.update()
 
-        if version_info["version"] != remote_version:
+        if self.local_version != self.remote_version:
             self.ui_components.overview.value = self.localizer.translate(
                 "update-from",
-                local_version=version_info["version"],
-                remote_version=remote_version
+                local_version=self.local_version,
+                remote_version=self.remote_version
             )
         else:
             self.ui_components.overview.value = self.localizer.translate(
                 "bugfix",
-                local_version=version_info["version"],
+                local_version=self.local_version,
             )
 
         self.ui_components.overview.update()
@@ -608,6 +610,7 @@ class StewartInstaller:
 
     def _handle_current_installation(self, version_info):
         self.no_detect = False
+        self.update_exists = False
 
         self.ui_components.update_button.disabled = False
         self.ui_components.update_button.opacity = 1.0
@@ -690,11 +693,17 @@ class StewartInstaller:
         else:
             if self.update_exists:
                 self.ui_components.update_button.text = self.localizer.translate("update")
-                self.ui_components.overview.value = self.localizer.translate(
-                    "update-from",
-                    local_version=self.local_version,
-                    remote_version=self.remote_version
-                )
+                if self.local_version != self.remote_version:
+                    self.ui_components.overview.value = self.localizer.translate(
+                        "update-from",
+                        local_version=self.local_version,
+                        remote_version=self.remote_version
+                    )
+                else:
+                    self.ui_components.overview.value = self.localizer.translate(
+                        "bugfix",
+                        local_version=self.local_version,
+                    )
             else:
                 self.ui_components.update_button.text = self.localizer.translate("launch")
                 self.ui_components.overview.value = self.localizer.translate(
