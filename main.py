@@ -624,6 +624,9 @@ class StewartInstaller:
         self.ui_components.overview.update()
 
     def update(self, e):
+        self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/loading.gif"
+        self.ui_components.image.update()
+
         install_path = Path(e.control.data[1])
         git_dir = install_path / ".git"
 
@@ -639,6 +642,8 @@ class StewartInstaller:
             self.version_manager.update_version_file(str(install_path), e.control.data[0])
 
             self._update_info(self.localizer.translate("update-successful", result=result.stdout))
+            self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
+            self.ui_components.image.update()
 
         except subprocess.CalledProcessError as err:
             self._update_info(self.localizer.translate("update-fail", error=err.stderr))
@@ -660,12 +665,12 @@ class StewartInstaller:
 
     def _update_ui_text(self):
         self.ui_components.install_button.text = self.localizer.translate("install")
+        self.ui_components.remove_button.text = self.localizer.translate("delete")
 
         if self.no_detect:
             self.ui_components.update_button.text = self.localizer.translate("update")
             self.ui_components.overview.value = self.localizer.translate("found-no-install")
         else:
-            self.ui_components.remove_button.text = self.localizer.translate("delete")
             if self.update_exists:
                 self.ui_components.update_button.text = self.localizer.translate("update")
                 self.ui_components.overview.value = self.localizer.translate(
@@ -714,6 +719,9 @@ class StewartInstaller:
         self.start_installation()
 
     def uninstall(self, e):
+        self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/loading.gif"
+        self.ui_components.image.update()
+
         self.ui_components.progress_bar.visible = True
         progress = InstallationProgress(
             self.ui_components.progress_bar,
@@ -741,6 +749,9 @@ class StewartInstaller:
             os.remove(path_to_updater)
 
         self._update_info(self.localizer.translate("remove-success"))
+        self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
+        self.ui_components.image.update()
+
         self._find_existing_installation()
 
     def start_installation(self):
@@ -850,6 +861,9 @@ class StewartInstaller:
 
         self.installing = False
         self.no_detect = False
+
+        self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
+        self.ui_components.image.update()
 
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
