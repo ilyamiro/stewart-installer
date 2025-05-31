@@ -690,9 +690,10 @@ class StewartInstaller:
     def launch_github(self, e):
         self.page.launch_url(GITHUB_URL)
 
-    def launch(self, e):
+    @staticmethod
+    def launch(e):
         subprocess.Popen(
-            ["bash", f"{PROJECT_DIR}/data/scripts/launch.sh", self.existing_installation_folder],
+            ["bash", f"{PROJECT_DIR}/data/scripts/launch.sh"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -873,10 +874,9 @@ class StewartInstaller:
 
         self._find_existing_installation()
 
-    @staticmethod
-    def _create_desktop_shortcut():
+    def _create_desktop_shortcut(self):
         subprocess.run(
-            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry.sh"],
+            ["bash", f"{PROJECT_DIR}/data/scripts/create_entry.sh", self.existing_installation_folder],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
