@@ -121,12 +121,19 @@ class GitManager:
             for file in dir_skip.rglob("*"):
                 if file.is_file():
                     rel_path = file.relative_to(path)
-                    subprocess.run(
-                        ["git", "update-index", "--skip-worktree", str(rel_path)],
-                        cwd=path,
-                        check=True
-                    )
 
+                    result = subprocess.run(
+                        ["git", "ls-files", "--error-unmatch", str(rel_path)],
+                        cwd=path,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    if result.returncode == 0:
+                        subprocess.run(
+                            ["git", "update-index", "--skip-worktree", str(rel_path)],
+                            cwd=path,
+                            check=True
+                        )
     @staticmethod
     def clone_repository(repo_url, target_path, branch="development"):
         return subprocess.Popen(
@@ -624,6 +631,10 @@ class StewartInstaller:
         self.ui_components.overview.update()
 
     def update(self, e):
+        self.ui_components.remove_button.disabled = True
+        self.ui_components.remove_button.opacity = 0.4
+        self.ui_components.remove_button.update()
+
         self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/loading.gif"
         self.ui_components.image.update()
 
@@ -645,8 +656,13 @@ class StewartInstaller:
             self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
             self.ui_components.image.update()
 
+            self.ui_components.remove_button.disabled = False
+            self.ui_components.remove_button.opacity = 1.0
+            self.ui_components.remove_button.update()
+
         except subprocess.CalledProcessError as err:
             self._update_info(self.localizer.translate("update-fail", error=err.stderr))
+
 
     def change_locale(self, e):
         if self.installing:
