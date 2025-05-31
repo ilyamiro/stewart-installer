@@ -882,8 +882,6 @@ class StewartInstaller:
         self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/stewart_logo.png"
         self.ui_components.image.update()
 
-        self._create_desktop_stewart_shortcut()
-
         if process.returncode == 0:
             progress.update_info(self.localizer.translate("install-success"))
             progress.set_progress(1.0)
@@ -891,6 +889,7 @@ class StewartInstaller:
             progress.update_info(self.localizer.translate("error-install"))
 
         self._find_existing_installation()
+        self._create_desktop_stewart_shortcut()
 
     @staticmethod
     def _create_desktop_shortcut():
