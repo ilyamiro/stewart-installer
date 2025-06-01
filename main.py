@@ -5,6 +5,8 @@ import time
 import yaml
 import json
 import shutil
+import platform
+import psutil
 import locale
 import signal
 import threading
@@ -20,6 +22,215 @@ PROJECT_DIR = Path(__file__).resolve().parent
 INSTALLED_FILE = f"{PROJECT_DIR}/.updater.json"
 GITHUB_URL = "https://github.com/ilyamiro/stewart.git"
 PURPLE = "#6736FD"
+RED = "#E5484D"
+
+
+class SystemInfo:
+    @staticmethod
+    def get_cpu_name():
+        cpu = platform.processor()
+        if cpu and cpu != 'unknown':
+            return cpu.strip()
+
+        uname = platform.uname()
+        if uname.processor and uname.processor != 'unknown':
+            return uname.processor.strip()
+
+        if sys.platform.startswith('linux'):
+            try:
+                with open("/proc/cpuinfo", "r") as f:
+                    for line in f:
+                        if "model name" in line:
+                            return line.strip().split(":")[1].strip()
+            except FileNotFoundError:
+                pass
+
+        if sys.platform == "darwin":
+            try:
+                import subprocess
+                return subprocess.check_output(
+                    ["sysctl", "-n", "machdep.cpu.brand_string"]
+                ).strip().decode()
+            except Exception:
+                pass
+
+        if sys.platform == "win32":
+            return os.environ.get("PROCESSOR_IDENTIFIER", "").strip()
+
+        return "Unknown CPU"
+
+    @staticmethod
+    def get_gpu_info():
+        """Get GPU information using built-in system commands (no external dependencies)"""
+        gpu_info = {
+            "gpu_name": "Unknown GPU",
+            "gpu_memory": "Unknown",
+            "gpu_driver": "Unknown",
+            "gpu_temp": "Unknown"
+        }
+
+        try:
+            import subprocess
+
+            if sys.platform == "win32":
+                # Use Windows built-in wmic command
+                try:
+                    # Get GPU name
+                    result = subprocess.check_output([
+                        "wmic", "path", "win32_VideoController", "get", "name", "/format:list"
+                    ], stderr=subprocess.DEVNULL, text=True).strip()
+
+                    for line in result.split('\n'):
+                        if line.startswith('Name=') and line != 'Name=':
+                            gpu_info["gpu_name"] = line.split('=', 1)[1].strip()
+                            break
+
+                    # Get GPU memory
+                    result = subprocess.check_output([
+                        "wmic", "path", "win32_VideoController", "get", "AdapterRAM", "/format:list"
+                    ], stderr=subprocess.DEVNULL, text=True).strip()
+
+                    for line in result.split('\n'):
+                        if line.startswith('AdapterRAM=') and line != 'AdapterRAM=':
+                            try:
+                                ram_bytes = int(line.split('=', 1)[1].strip())
+                                gpu_info["gpu_memory"] = f"{ram_bytes // (1024 ** 2)} MB"
+                            except (ValueError, ZeroDivisionError):
+                                pass
+                            break
+
+                    # Get driver version
+                    result = subprocess.check_output([
+                        "wmic", "path", "win32_VideoController", "get", "DriverVersion", "/format:list"
+                    ], stderr=subprocess.DEVNULL, text=True).strip()
+
+                    for line in result.split('\n'):
+                        if line.startswith('DriverVersion=') and line != 'DriverVersion=':
+                            gpu_info["gpu_driver"] = line.split('=', 1)[1].strip()
+                            break
+
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+
+            elif sys.platform.startswith('linux'):
+                # Try lspci first for basic GPU info (works for all GPU vendors)
+                try:
+                    result = subprocess.check_output([
+                        "lspci", "-mm"
+                    ], stderr=subprocess.DEVNULL, text=True)
+
+                    for line in result.split('\n'):
+                        if 'VGA compatible controller' in line or 'Display controller' in line or '3D controller' in line:
+                            # Parse lspci -mm output format
+                            parts = line.split('"')
+                            if len(parts) >= 6:
+                                gpu_info["gpu_name"] = f"{parts[3]} {parts[5]}"
+                            break
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+
+                # Try nvidia-smi for NVIDIA-specific info (temperature, memory, driver)
+                if "NVIDIA" in gpu_info.get("gpu_name", "").upper() or gpu_info["gpu_name"] == "Unknown GPU":
+                    try:
+                        result = subprocess.check_output([
+                            "nvidia-smi", "--query-gpu=name,memory.total,driver_version,temperature.gpu",
+                            "--format=csv,noheader,nounits"
+                        ], stderr=subprocess.DEVNULL, text=True).strip()
+
+                        if result and not result.startswith("NVIDIA-SMI has failed"):
+                            parts = [p.strip() for p in result.split(',')]
+                            if len(parts) >= 4:
+                                gpu_info["gpu_name"] = parts[0]
+                                gpu_info["gpu_memory"] = f"{parts[1]} MB"
+                                gpu_info["gpu_driver"] = parts[2]
+                                if parts[3] and parts[3] != "[Not Supported]":
+                                    gpu_info["gpu_temp"] = f"{parts[3]}°C"
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        pass
+
+                # Try AMD-specific commands
+                if "AMD" in gpu_info.get("gpu_name", "").upper() or "ATI" in gpu_info.get("gpu_name", "").upper():
+                    try:
+                        # Try to get AMD GPU info from sysfs
+                        import glob
+                        amd_cards = glob.glob('/sys/class/drm/card*/device/vendor')
+                        for card_path in amd_cards:
+                            try:
+                                with open(card_path, 'r') as f:
+                                    vendor = f.read().strip()
+                                if vendor == '0x1002':  # AMD vendor ID
+                                    # Try to get memory info from sysfs
+                                    mem_path = card_path.replace('/vendor', '/mem_info_vram_total')
+                                    try:
+                                        with open(mem_path, 'r') as f:
+                                            mem_bytes = int(f.read().strip())
+                                            gpu_info["gpu_memory"] = f"{mem_bytes // (1024 ** 2)} MB"
+                                    except (FileNotFoundError, ValueError):
+                                        pass
+                                    break
+                            except (FileNotFoundError, ValueError):
+                                continue
+                    except ImportError:
+                        pass
+
+            elif sys.platform == "darwin":
+                try:
+                    # Use system_profiler for macOS
+                    result = subprocess.check_output([
+                        "system_profiler", "SPDisplaysDataType"
+                    ], stderr=subprocess.DEVNULL, text=True)
+
+                    # Parse system_profiler output
+                    lines = result.split('\n')
+                    for i, line in enumerate(lines):
+                        if 'Chipset Model:' in line:
+                            gpu_info["gpu_name"] = line.split(':', 1)[1].strip()
+                        elif 'VRAM (Total):' in line or 'VRAM (Dynamic, Max):' in line:
+                            gpu_info["gpu_memory"] = line.split(':', 1)[1].strip()
+
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+
+        except Exception:
+            pass
+
+        return gpu_info
+
+    def get_system_info(self):
+        try:
+            # Get system information
+            system_info = {
+                "os": f"{platform.system()} {platform.release()}",
+                "architecture": platform.machine(),
+                "processor": self.get_cpu_name(),
+                "python_version": platform.python_version(),
+                "hostname": platform.node(),
+            }
+
+            # Get memory information
+            memory = psutil.virtual_memory()
+            system_info["ram_total"] = f"{memory.total // (1024 ** 3)} GB"
+            system_info["ram_available"] = f"{memory.available // (1024 ** 3)} GB"
+            system_info["ram_percent"] = f"{memory.percent}%"
+
+            # Get disk information
+            disk = psutil.disk_usage('/')
+            system_info["disk_total"] = f"{disk.total // (1024 ** 3)} GB"
+            system_info["disk_free"] = f"{disk.free // (1024 ** 3)} GB"
+            system_info["disk_percent"] = f"{(disk.used / disk.total * 100):.1f}%"
+
+            # Get CPU information
+            system_info["cpu_cores"] = psutil.cpu_count(logical=False)
+            system_info["cpu_threads"] = psutil.cpu_count(logical=True)
+            system_info["cpu_freq"] = f"{psutil.cpu_freq().max:.0f} MHz" if psutil.cpu_freq() else "Unknown"
+
+            # Get GPU information
+            gpu_info = self.get_gpu_info()
+            system_info.update(gpu_info)
+
+            return system_info
+        except Exception as e:
+            return {"error": str(e)}
 
 
 def get_system_language():
@@ -252,7 +463,7 @@ class UIComponents:
         self.language_items = []
         self.language_change = None
         self.app_bar_file_pick = None
-        self.app_bar_launch_github = None
+        self.info_dialog = None
         self.appbar = None
         self.progress_bar = None
         self.overview = None
@@ -264,13 +475,299 @@ class UIComponents:
         self.remove_yes_button = None
         self.remove_no_button = None
 
+    @staticmethod
+    def create_info_card(title, items, icon_name):
+        card_items = []
+        for label, value in items:
+            card_items.append(
+                ft.Row([
+                    ft.Text(
+                        f"{label}:",
+                        size=15,
+                        color=ft.Colors.with_opacity(0.7, "white"),
+                        weight=ft.FontWeight.W_500,
+                        width=160
+                    ),
+                    ft.Text(
+                        str(value),
+                        size=15,
+                        color="white",
+                        weight=ft.FontWeight.W_400,
+                        selectable=True
+                    )
+                ], spacing=8)
+            )
+
+        return ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Icon(icon_name, color=PURPLE, size=24),
+                    ft.Text(
+                        title,
+                        size=16,
+                        color="white",
+                        weight=ft.FontWeight.W_600
+                    )
+                ], spacing=12, alignment=ft.MainAxisAlignment.START),
+                ft.Container(height=8),
+                ft.Column(card_items, spacing=6)
+            ], spacing=0),
+            padding=ft.padding.all(16),
+            margin=ft.margin.symmetric(vertical=4),
+            bgcolor=ft.Colors.with_opacity(0.05, "white"),
+            border_radius=12,
+            border=ft.border.all(1, ft.Colors.with_opacity(0.1, "white"))
+        )
+
+    def copy_system_info(self, e):
+        try:
+            system_info = SystemInfo.get_system_info()
+
+            info_text = f"=== {self.localizer.translate('system-info-header')} ===\n\n"
+            info_text += f"{self.localizer.translate('stewart-info-section')}:\n"
+            info_text += f"{self.localizer.translate('local-version')}: {getattr(self, 'local_version', self.localizer.translate('not-installed'))}\n"
+            info_text += f"{self.localizer.translate('remote-version')}: {getattr(self, 'remote_version', self.localizer.translate('unknown'))}\n"
+            info_text += f"{self.localizer.translate('install-path')}: {getattr(self, 'existing_installation_folder', self.localizer.translate('not-installed'))}\n"
+            info_text += f"{self.localizer.translate('repository')}: {GITHUB_URL}\n"
+            info_text += f"{self.localizer.translate('language')}: {self.localizer.lang.upper()}\n\n"
+
+            if "error" not in system_info:
+                info_text += f"{self.localizer.translate('system-info-section')}:\n"
+                info_text += f"{self.localizer.translate('os')}: {system_info.get('os', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('architecture')}: {system_info.get('architecture', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('hostname')}: {system_info.get('hostname', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('python')}: {system_info.get('python_version', self.localizer.translate('unknown'))}\n\n"
+
+                info_text += f"{self.localizer.translate('hardware-info-section')}:\n"
+                info_text += f"{self.localizer.translate('processor')}: {system_info.get('processor', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('cpu-cores')}: {system_info.get('cpu_cores', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('cpu-threads')}: {system_info.get('cpu_threads', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('cpu-frequency')}: {system_info.get('cpu_freq', self.localizer.translate('unknown'))}\n\n"
+
+                info_text += f"{self.localizer.translate('memory-storage-section')}:\n"
+                info_text += f"{self.localizer.translate('total-ram')}: {system_info.get('ram_total', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('available-ram')}: {system_info.get('ram_available', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('ram-usage')}: {system_info.get('ram_percent', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('total-disk')}: {system_info.get('disk_total', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('free-disk')}: {system_info.get('disk_free', self.localizer.translate('unknown'))}\n"
+                info_text += f"{self.localizer.translate('disk-usage')}: {system_info.get('disk_percent', self.localizer.translate('unknown'))}\n"
+            else:
+                info_text += f"{self.localizer.translate('system-info-error')}: {system_info['error']}\n"
+
+            # Copy to clipboard using the page's set_clipboard method
+            self.page.set_clipboard(info_text)
+
+            snack_bar = ft.SnackBar(
+                content=ft.Text(self.localizer.translate("info-copy-success"), color="white", size=16),
+                behavior=ft.SnackBarBehavior.FIXED,
+                duration=2000,
+                bgcolor=PURPLE,
+                width=400,
+            )
+            self.page.open(snack_bar)
+
+        except Exception as error:
+            snack_bar = ft.SnackBar(
+                content=ft.Text(self.localizer.translate("info-copy-fail", error=str(error)), color="white", size=16),
+                behavior=ft.SnackBarBehavior.FIXED,
+                duration=3000,
+                bgcolor=RED,
+                width=400,
+            )
+            self.page.open(snack_bar)
+
+    def create_info_dialog(self):
+        info_collector = SystemInfo()
+        system_info = info_collector.get_system_info()
+
+        stewart_items = [
+            (self.localizer.translate("version"),
+             f"{getattr(self, 'local_version', self.localizer.translate('not-installed'))}"),
+            (self.localizer.translate("remote"), getattr(self, 'remote_version', self.localizer.translate('unknown'))),
+            (self.localizer.translate("install-path"),
+             getattr(self, 'existing_installation_folder', self.localizer.translate('not-installed'))),
+            (self.localizer.translate("repository"), GITHUB_URL),
+            (self.localizer.translate("language"), self.localizer.lang.upper())
+        ]
+
+        stewart_card = self.create_info_card(
+            self.localizer.translate("stewart-information"),
+            stewart_items,
+            ft.Icons.ROCKET_LAUNCH
+        )
+
+        if "error" not in system_info:
+            system_items = [
+                (self.localizer.translate("operating-system"),
+                 system_info.get("os", self.localizer.translate("unknown"))),
+                (self.localizer.translate("architecture"),
+                 system_info.get("architecture", self.localizer.translate("unknown"))),
+                (self.localizer.translate("hostname"),
+                 system_info.get("hostname", self.localizer.translate("unknown"))),
+                (self.localizer.translate("python-version"),
+                 system_info.get("python_version", self.localizer.translate("unknown")))
+            ]
+        else:
+            system_items = [(self.localizer.translate("error"), system_info["error"])]
+
+        system_card = self.create_info_card(
+            self.localizer.translate("system-information"),
+            system_items,
+            ft.Icons.COMPUTER
+        )
+
+        if "error" not in system_info:
+            processor_text = system_info.get("processor", self.localizer.translate("unknown"))
+            if len(processor_text) > 50:
+                processor_text = processor_text[:50] + "..."
+
+            gpu_name = system_info.get("gpu_name", self.localizer.translate("unknown"))
+            if len(gpu_name) > 50:
+                gpu_name = gpu_name[:50] + "..."
+
+            hardware_items = [
+                (self.localizer.translate("processor"), processor_text),
+                (self.localizer.translate("cpu-cores"),
+                 f"{system_info.get('cpu_cores', self.localizer.translate('unknown'))} {self.localizer.translate('cores')}"),
+                (self.localizer.translate("cpu-threads"),
+                 f"{system_info.get('cpu_threads', self.localizer.translate('unknown'))} {self.localizer.translate('threads')}"),
+                (self.localizer.translate("cpu-frequency"),
+                 system_info.get("cpu_freq", self.localizer.translate("unknown"))),
+
+                (self.localizer.translate("gpu-name"), gpu_name),
+                (self.localizer.translate("gpu-memory"),
+                 system_info.get("gpu_memory", self.localizer.translate("unknown"))),
+                (self.localizer.translate("gpu-driver"),
+                 system_info.get("gpu_driver", self.localizer.translate("unknown"))),
+                (self.localizer.translate("gpu-temperature"),
+                 system_info.get("gpu_temp", self.localizer.translate("unknown")))
+            ]
+        else:
+            hardware_items = [(self.localizer.translate("error"), self.localizer.translate("unable-retrieve-hardware"))]
+
+        hardware_card = self.create_info_card(
+            self.localizer.translate("hardware-information"),
+            hardware_items,
+            ft.Icons.MEMORY
+        )
+
+        if "error" not in system_info:
+            storage_items = [
+                (self.localizer.translate("total-ram"),
+                 system_info.get("ram_total", self.localizer.translate("unknown"))),
+                (self.localizer.translate("available-ram"),
+                 system_info.get("ram_available", self.localizer.translate("unknown"))),
+                (self.localizer.translate("ram-usage"),
+                 system_info.get("ram_percent", self.localizer.translate("unknown"))),
+                (self.localizer.translate("total-disk"),
+                 system_info.get("disk_total", self.localizer.translate("unknown"))),
+                (self.localizer.translate("free-disk"),
+                 system_info.get("disk_free", self.localizer.translate("unknown"))),
+                (self.localizer.translate("disk-usage"),
+                 system_info.get("disk_percent", self.localizer.translate("unknown")))
+            ]
+        else:
+            storage_items = [(self.localizer.translate("error"), self.localizer.translate("unable-retrieve-storage"))]
+
+        storage_card = self.create_info_card(
+            self.localizer.translate("memory-storage"),
+            storage_items,
+            ft.Icons.STORAGE
+        )
+
+        # Action buttons
+        close_button = ft.TextButton(
+            text=self.localizer.translate("close"),
+            style=ft.ButtonStyle(
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
+                color="white",
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),
+                elevation=2,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_500
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, "white")
+                }
+            ),
+            on_click=lambda e: self.page.close(self.info_dialog)
+        )
+
+        copy_button = ft.TextButton(
+            text=self.localizer.translate("copy-info"),
+            icon=ft.Icons.COPY,
+            style=ft.ButtonStyle(
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
+                color="white",
+                bgcolor=PURPLE,
+                elevation=3,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_600
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+                },
+                icon_size=20
+            ),
+            on_click=self.copy_system_info
+        )
+
+        content = ft.Container(
+            content=ft.Column([
+                stewart_card,
+                system_card,
+                hardware_card,
+                storage_card
+            ], spacing=8, scroll=ft.ScrollMode.AUTO),
+            height=500,
+            width=850
+        )
+
+        self.info_dialog = ft.AlertDialog(
+            title=ft.Container(
+                content=ft.Row([
+                    ft.Icon(ft.Icons.INFO_OUTLINE, color=PURPLE, size=28),
+                    ft.Text(
+                        self.localizer.translate("system-app-information"),
+                        size=20,
+                        weight=ft.FontWeight.W_600,
+                        color="white"
+                    )
+                ], spacing=12, alignment=ft.MainAxisAlignment.START),
+                padding=ft.padding.only(bottom=8)
+            ),
+            content=content,
+            actions=[
+                ft.Container(
+                    content=ft.Row([
+                        copy_button,
+                        ft.Container(width=12),
+                        close_button
+                    ], alignment=ft.MainAxisAlignment.END, spacing=0),
+                    padding=ft.padding.only(top=16)
+                )
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+            bgcolor=ft.Colors.with_opacity(0.95, ft.Colors.GREY_900),
+            surface_tint_color=ft.Colors.TRANSPARENT,
+            shape=ft.RoundedRectangleBorder(radius=16),
+            elevation=8
+        )
+
     def create_remove_dialog(self):
         self.remove_no_button = ft.TextButton(
             text=self.localizer.translate("no"),
             style=ft.ButtonStyle(
                 padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
-                bgcolor=ft.Colors.with_opacity(0.1, "white"),  # Subtle background
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),
                 elevation=2,
                 text_style=ft.TextStyle(
                     size=16,
@@ -290,7 +787,7 @@ class UIComponents:
             style=ft.ButtonStyle(
                 padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
-                bgcolor=PURPLE,
+                bgcolor=RED,
                 elevation=3,
                 text_style=ft.TextStyle(
                     size=16,
@@ -404,27 +901,21 @@ class UIComponents:
             ),
         )
 
-        self.app_bar_launch_github = ft.TextButton(
-            icon=ft.Icons.LINK,
-            text="GitHub",
+        self.info_bar = ft.IconButton(
+            icon=ft.Icons.INFO_OUTLINED,
             on_click=None,
             style=ft.ButtonStyle(
                 padding=0,
                 color="white",
-                icon_size=28,
-                text_style=ft.TextStyle(
-                    size=18
-                )
-            ),
-            tooltip=GITHUB_URL
+                icon_size=30
+            )
         )
 
         self.appbar = ft.AppBar(
-            leading=self.app_bar_launch_github,
-            leading_width=120,
             title=self.app_bar_file_pick,
             center_title=True,
             actions=[
+                self.info_bar,
                 self.language_change
             ],
         )
@@ -484,7 +975,7 @@ class UIComponents:
             style=ft.ButtonStyle(
                 padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
-                bgcolor=PURPLE,
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),
                 elevation=3,
                 text_style=ft.TextStyle(
                     size=16,
@@ -653,6 +1144,7 @@ class StewartInstaller:
         self.ui_components.create_image()
         self.ui_components.create_buttons()
         self.ui_components.create_remove_dialog()
+        self.ui_components.create_info_dialog()
 
         self._bind_event_handlers()
 
@@ -660,7 +1152,7 @@ class StewartInstaller:
         for item in self.ui_components.language_items:
             item.on_click = self.change_locale
 
-        self.ui_components.app_bar_launch_github.on_click = self.launch_github
+        self.ui_components.info_bar.on_click = self.launch_info_dialog
         self.ui_components.install_button.on_click = self.install
         self.ui_components.update_button.on_click = self.update
         self.ui_components.remove_button.on_click = lambda e: self.page.open(self.ui_components.remove_dialog)
@@ -766,6 +1258,15 @@ class StewartInstaller:
         )
         self.ui_components.overview.update()
 
+    def launch_info_dialog(self, e):
+        self.ui_components.local_version = self.local_version
+        self.ui_components.remote_version = self.remote_version
+        self.ui_components.existing_installation_folder = self.existing_installation_folder
+        self.ui_components.page = self.page
+
+        self.ui_components.create_info_dialog()
+        self.page.open(self.ui_components.info_dialog)
+
     def update(self, e):
         self.ui_components.remove_button.disabled = True
         self.ui_components.remove_button.opacity = 0.4
@@ -806,6 +1307,7 @@ class StewartInstaller:
             snack_bar = ft.SnackBar(
                 content=ft.Text(self.localizer.translate("change-lang"), color="white", size=18),
                 behavior=ft.SnackBarBehavior.FIXED,
+                bgcolor=PURPLE,
                 duration=2000,
                 width=550,
             )
@@ -820,10 +1322,13 @@ class StewartInstaller:
         self.ui_components.remove_yes_button.text = self.localizer.translate("yes")
         self.ui_components.remove_no_button.text = self.localizer.translate("no")
         self.ui_components.remove_dialog.title.content.value = self.localizer.translate("confirm-uninstall")
-        self.ui_components.remove_dialog.content.content.controls[2].value = self.localizer.translate("uninstall-dialog")
+        self.ui_components.remove_dialog.content.content.controls[2].value = self.localizer.translate(
+            "uninstall-dialog")
 
         self.ui_components.install_button.text = self.localizer.translate("install")
         self.ui_components.remove_button.text = self.localizer.translate("delete")
+
+        self.ui_components.language_change.tooltip = self.localizer.translate("choose-lang")
 
         if self.no_detect:
             self.ui_components.update_button.text = self.localizer.translate("update")
@@ -848,6 +1353,8 @@ class StewartInstaller:
                     "found-install",
                     local_version=self.local_version
                 )
+
+        self.ui_components.create_info_dialog()
 
         self.page.update()
 
@@ -1090,7 +1597,7 @@ class StewartInstaller:
                     spacing=65,
                     expand=True,
                 ),
-            ])
+            ],)
         )
         self.page.update()
 
