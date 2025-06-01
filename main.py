@@ -134,6 +134,7 @@ class GitManager:
                             cwd=path,
                             check=True
                         )
+
     @staticmethod
     def clone_repository(repo_url, target_path, branch="development"):
         return subprocess.Popen(
@@ -256,9 +257,112 @@ class UIComponents:
         self.progress_bar = None
         self.overview = None
         self.image = None
+        self.remove_dialog = None
         self.install_button = None
         self.remove_button = None
         self.update_button = None
+        self.remove_yes_button = None
+        self.remove_no_button = None
+
+    def create_remove_dialog(self):
+        self.remove_no_button = ft.TextButton(
+            text=self.localizer.translate("no"),
+            style=ft.ButtonStyle(
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
+                color="white",
+                bgcolor=ft.Colors.with_opacity(0.1, "white"),  # Subtle background
+                elevation=2,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_500
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, "white")
+                }
+            ),
+            on_click=None
+        )
+
+        self.remove_yes_button = ft.TextButton(
+            text=self.localizer.translate("yes"),
+            style=ft.ButtonStyle(
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
+                color="white",
+                bgcolor=PURPLE,
+                elevation=3,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_600
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+                }
+            ),
+            on_click=None
+        )
+
+        content = ft.Column(
+            controls=[
+                ft.Icon(
+                    name=ft.Icons.WARNING_AMBER_ROUNDED,
+                    color=ft.Colors.AMBER_400,
+                    size=52
+                ),
+                ft.Container(height=16),  # Spacer
+                ft.Text(
+                    self.localizer.translate("uninstall-dialog"),
+                    size=16,
+                    color=ft.Colors.with_opacity(0.8, "white"),
+                    text_align=ft.TextAlign.CENTER,
+                    weight=ft.FontWeight.W_400
+                )
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=0,
+            height=100
+        )
+
+        self.remove_dialog = ft.AlertDialog(
+            title=ft.Container(
+                content=ft.Text(
+                    self.localizer.translate("confirm-uninstall"),
+                    size=20,
+                    weight=ft.FontWeight.W_600,
+                    color="white",
+                    text_align=ft.TextAlign.CENTER
+                ),
+                padding=ft.padding.only(bottom=8)
+            ),
+            content=ft.Container(
+                content=content,
+                padding=ft.padding.symmetric(horizontal=16, vertical=8),
+                width=320
+            ),
+            actions=[
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            self.remove_no_button,
+                            ft.Container(width=12),  # Spacer between buttons
+                            self.remove_yes_button
+                        ],
+                        alignment=ft.MainAxisAlignment.END,
+                        spacing=0
+                    ),
+                    padding=ft.padding.only(top=16)
+                )
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+            bgcolor=ft.Colors.with_opacity(0.95, ft.Colors.GREY_900),  # Subtle dark background
+            surface_tint_color=ft.Colors.TRANSPARENT,
+            shape=ft.RoundedRectangleBorder(radius=16),
+            elevation=8
+        )
 
     def create_language_menu(self):
         for locale in self.localizer.locales.keys():
@@ -350,12 +454,21 @@ class UIComponents:
             icon=ft.Icons.DOWNLOADING,
             icon_color="white",
             text=self.localizer.translate("install"),
-            scale=1.5,
+            scale=1.25,
             style=ft.ButtonStyle(
-                padding=10,
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
                 bgcolor=PURPLE,
-                elevation=4,
+                elevation=3,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_600
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+                },
                 icon_size=25
             ),
             on_click=None
@@ -367,12 +480,21 @@ class UIComponents:
             disabled=True,
             opacity=0.4,
             text=self.localizer.translate("delete"),
-            scale=1.5,
+            scale=1.25,
             style=ft.ButtonStyle(
-                padding=10,
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
                 bgcolor=PURPLE,
-                elevation=4,
+                elevation=3,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_600
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+                },
                 icon_size=25
             ),
             on_click=None
@@ -384,13 +506,22 @@ class UIComponents:
             icon_color="white",
             disabled=True,
             text=self.localizer.translate("update"),
-            scale=1.5,
+            scale=1.25,
             style=ft.ButtonStyle(
-                padding=10,
+                padding=ft.padding.symmetric(horizontal=24, vertical=12),
                 color="white",
                 bgcolor=PURPLE,
-                elevation=4,
-                icon_size=25,
+                elevation=3,
+                text_style=ft.TextStyle(
+                    size=16,
+                    weight=ft.FontWeight.W_600
+                ),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                overlay_color={
+                    ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+                    ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+                },
+                icon_size=25
             ),
             on_click=None,
         )
@@ -522,6 +653,7 @@ class StewartInstaller:
         self.ui_components.create_overview()
         self.ui_components.create_image()
         self.ui_components.create_buttons()
+        self.ui_components.create_remove_dialog()
 
         self._bind_event_handlers()
 
@@ -532,7 +664,9 @@ class StewartInstaller:
         self.ui_components.app_bar_launch_github.on_click = self.launch_github
         self.ui_components.install_button.on_click = self.install
         self.ui_components.update_button.on_click = self.update
-        self.ui_components.remove_button.on_click = self.uninstall
+        self.ui_components.remove_button.on_click = lambda e: self.page.open(self.ui_components.remove_dialog)
+        self.ui_components.remove_no_button.on_click = lambda e: self.page.close(self.ui_components.remove_dialog)
+        self.ui_components.remove_yes_button.on_click = self.uninstall
 
     def _find_existing_installation(self):
         version_info = self.version_manager.get_local_version_info(INSTALLED_FILE)
@@ -684,6 +818,11 @@ class StewartInstaller:
         self._update_ui_text()
 
     def _update_ui_text(self):
+        self.ui_components.remove_yes_button.text = self.localizer.translate("yes")
+        self.ui_components.remove_no_button.text = self.localizer.translate("no")
+        self.ui_components.remove_dialog.title.content.value = self.localizer.translate("confirm-uninstall")
+        self.ui_components.remove_dialog.content.content.controls[2].value = self.localizer.translate("uninstall-dialog")
+
         self.ui_components.install_button.text = self.localizer.translate("install")
         self.ui_components.remove_button.text = self.localizer.translate("delete")
 
@@ -938,7 +1077,8 @@ class StewartInstaller:
                 ft.Row([self.ui_components.overview], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Text(),
                 ft.Row(
-                    [self.ui_components.update_button, self.ui_components.install_button, self.ui_components.remove_button],
+                    [self.ui_components.update_button, self.ui_components.install_button,
+                     self.ui_components.remove_button],
                     alignment=ft.MainAxisAlignment.CENTER,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=65,
