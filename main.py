@@ -1204,7 +1204,7 @@ class StewartInstaller:
         self.remote_version = remote_version
         self.existing_installation_folder = version_info["path"]
 
-        if remote_version != version_info["version"] or self.version_manager.has_relevant_updates(version_info["path"]):
+        if remote_version != version_info["version"] or self.version_manager.has_relevant_updates(version_info["path"], self.git_manager.excluded_dirs):
             self._handle_update_available(version_info, remote_version)
         else:
             self._handle_current_installation(version_info)
