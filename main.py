@@ -325,6 +325,8 @@ class NetworkManager:
 
 
 class GitManager:
+    excluded_dirs = ("plugins/core/", "plugins/custom/", "plugins/gpt/", "config/", "docs/")
+
     @staticmethod
     def skip_work_tree(path, name):
         dir_skip = path / name
@@ -394,7 +396,7 @@ class GitManager:
 
 class VersionManager:
     @staticmethod
-    def has_relevant_updates(path):
+    def has_relevant_updates(path, excluded_dirs):
         subprocess.run(["git", "fetch", "--all"], cwd=path, check=True)
 
         result = subprocess.run(
@@ -407,7 +409,6 @@ class VersionManager:
         if changed_files == ['']:
             changed_files = []
 
-        excluded_dirs = ("plugins/core/", "plugins/custom/", "plugins/gpt/", "config/", "docs/")
         relevant_changes = [
             f for f in changed_files if not any(f.startswith(d) for d in excluded_dirs)
         ]
@@ -1308,10 +1309,10 @@ class StewartInstaller:
             return
 
         try:
-            self.git_manager.skip_work_tree(install_path, "config")
-            self.git_manager.skip_work_tree(install_path, "plugins")
+            for directory in self.git_manager.excluded_dirs:
+                self.git_manager.skip_work_tree(install_path, directory)
 
-            result = self.git_manager.pull_updates(install_path)
+            result = self.git_manager.pull_updates(install_path, self.git_manager.excluded_dirs)
             self.version_manager.update_version_file(str(install_path), e.control.data[0])
 
             self._update_info(self.localizer.translate("update-successful"))
