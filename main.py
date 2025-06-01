@@ -12,6 +12,7 @@ import signal
 import threading
 import subprocess
 import concurrent.futures
+import tempfile
 import http.client
 from pathlib import Path
 from datetime import datetime, timezone
