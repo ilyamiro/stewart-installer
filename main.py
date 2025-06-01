@@ -548,7 +548,8 @@ class UIComponents:
 
     def copy_system_info(self, e):
         try:
-            system_info = SystemInfo.get_system_info()
+            info_collector = SystemInfo()
+            system_info = info_collector.get_system_info()
 
             info_text = f"=== {self.localizer.translate('system-info-header')} ===\n\n"
             info_text += f"{self.localizer.translate('stewart-info-section')}:\n"
