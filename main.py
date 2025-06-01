@@ -433,13 +433,13 @@ class UIComponents:
         self.progress_bar = ft.ProgressBar(
             width=400,
             color=PURPLE,
-            bar_height=20,
+            bar_height=40,
             value=0,
             visible=False
         )
 
     def create_overview(self):
-        self.overview = ft.Markdown(scale=1.4)
+        self.overview = ft.Markdown(scale=1.3)
 
     def create_image(self):
         self.image = ft.Image(
@@ -612,8 +612,7 @@ class InstallationHandler:
         elif "Successfully installed" in line:
             packages = re.findall(r'Successfully installed (.+)', line)
             if packages:
-                package_list = packages[0].replace('-', ' ').split()[:10]
-                self.progress.update_info(self.localizer.translate("success-python", pkg_list=', '.join(package_list)))
+                self.progress.update_info(self.localizer.translate("success-python"))
 
         elif "Collecting" in line and "pip" not in line.lower():
             package = line.replace("Collecting ", "").split()[0]
@@ -875,16 +874,24 @@ class StewartInstaller:
 
         if directory:
             self.installation_folder = directory
+            return True
+        return False
 
     def _update_info(self, message):
         self.ui_components.overview.value = message
         self.ui_components.overview.update()
 
     def install(self, e):
-        self.file_pick()
+        success = self.file_pick()
+        if not success:
+            self.ui_components.overview.value = self.localizer.translate("abort-install")
+            self.ui_components.overview.update()
+            return
         self.start_installation()
 
     def uninstall(self, e):
+        self.page.close(self.ui_components.remove_dialog)
+
         self.ui_components.image.src = f"{PROJECT_DIR}/data/assets/loading.gif"
         self.ui_components.image.update()
 
@@ -925,7 +932,6 @@ class StewartInstaller:
         self.ui_components.update_button.opacity = 0.4
         self.ui_components.update_button.icon = ft.Icons.UPDATE
         self.ui_components.update_button.text = self.localizer.translate("update")
-        self.ui_components.update_button.style.text_style = None
         self.ui_components.update_button.update()
 
         self.installing = True
