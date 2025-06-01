@@ -357,14 +357,39 @@ class GitManager:
         )
 
     @staticmethod
-    def pull_updates(path):
-        return subprocess.run(
-            ["git", "pull"],
-            cwd=path,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+    def backup_excluded_dirs(path, excluded_dirs):
+        backup = tempfile.TemporaryDirectory()
+        for d in excluded_dirs:
+            src = path / d
+            dst = Path(backup.name) / d
+            if src.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+        return backup
+
+    @staticmethod
+    def restore_excluded_dirs(path, backup, excluded_dirs):
+        for d in excluded_dirs:
+            src = Path(backup.name) / d
+            dst = path / d
+            if src.exists():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+
+    @staticmethod
+    def pull_updates(path, excluded_dirs):
+        backup = GitManager.backup_excluded_dirs(path, excluded_dirs)
+        try:
+            result = subprocess.run(
+                ["git", "pull"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            GitManager.restore_excluded_dirs(path, backup, excluded_dirs)
+            return result
+        finally:
+            backup.cleanup()
 
 
 class VersionManager:
