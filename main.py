@@ -62,7 +62,6 @@ class SystemInfo:
 
     @staticmethod
     def get_gpu_info():
-        """Get GPU information using built-in system commands (no external dependencies)"""
         gpu_info = {
             "gpu_name": "Unknown GPU",
             "gpu_memory": "Unknown",
@@ -74,9 +73,7 @@ class SystemInfo:
             import subprocess
 
             if sys.platform == "win32":
-                # Use Windows built-in wmic command
                 try:
-                    # Get GPU name
                     result = subprocess.check_output([
                         "wmic", "path", "win32_VideoController", "get", "name", "/format:list"
                     ], stderr=subprocess.DEVNULL, text=True).strip()
@@ -86,7 +83,6 @@ class SystemInfo:
                             gpu_info["gpu_name"] = line.split('=', 1)[1].strip()
                             break
 
-                    # Get GPU memory
                     result = subprocess.check_output([
                         "wmic", "path", "win32_VideoController", "get", "AdapterRAM", "/format:list"
                     ], stderr=subprocess.DEVNULL, text=True).strip()
@@ -100,7 +96,6 @@ class SystemInfo:
                                 pass
                             break
 
-                    # Get driver version
                     result = subprocess.check_output([
                         "wmic", "path", "win32_VideoController", "get", "DriverVersion", "/format:list"
                     ], stderr=subprocess.DEVNULL, text=True).strip()
@@ -114,7 +109,6 @@ class SystemInfo:
                     pass
 
             elif sys.platform.startswith('linux'):
-                # Try lspci first for basic GPU info (works for all GPU vendors)
                 try:
                     result = subprocess.check_output([
                         "lspci", "-mm"
@@ -149,18 +143,15 @@ class SystemInfo:
                     except (subprocess.CalledProcessError, FileNotFoundError):
                         pass
 
-                # Try AMD-specific commands
                 if "AMD" in gpu_info.get("gpu_name", "").upper() or "ATI" in gpu_info.get("gpu_name", "").upper():
                     try:
-                        # Try to get AMD GPU info from sysfs
                         import glob
                         amd_cards = glob.glob('/sys/class/drm/card*/device/vendor')
                         for card_path in amd_cards:
                             try:
                                 with open(card_path, 'r') as f:
                                     vendor = f.read().strip()
-                                if vendor == '0x1002':  # AMD vendor ID
-                                    # Try to get memory info from sysfs
+                                if vendor == '0x1002':
                                     mem_path = card_path.replace('/vendor', '/mem_info_vram_total')
                                     try:
                                         with open(mem_path, 'r') as f:
@@ -176,12 +167,10 @@ class SystemInfo:
 
             elif sys.platform == "darwin":
                 try:
-                    # Use system_profiler for macOS
                     result = subprocess.check_output([
                         "system_profiler", "SPDisplaysDataType"
                     ], stderr=subprocess.DEVNULL, text=True)
 
-                    # Parse system_profiler output
                     lines = result.split('\n')
                     for i, line in enumerate(lines):
                         if 'Chipset Model:' in line:
@@ -199,7 +188,6 @@ class SystemInfo:
 
     def get_system_info(self):
         try:
-            # Get system information
             system_info = {
                 "os": f"{platform.system()} {platform.release()}",
                 "architecture": platform.machine(),
@@ -208,24 +196,20 @@ class SystemInfo:
                 "hostname": platform.node(),
             }
 
-            # Get memory information
             memory = psutil.virtual_memory()
             system_info["ram_total"] = f"{memory.total // (1024 ** 3)} GB"
             system_info["ram_available"] = f"{memory.available // (1024 ** 3)} GB"
             system_info["ram_percent"] = f"{memory.percent}%"
 
-            # Get disk information
             disk = psutil.disk_usage('/')
             system_info["disk_total"] = f"{disk.total // (1024 ** 3)} GB"
             system_info["disk_free"] = f"{disk.free // (1024 ** 3)} GB"
             system_info["disk_percent"] = f"{(disk.used / disk.total * 100):.1f}%"
 
-            # Get CPU information
             system_info["cpu_cores"] = psutil.cpu_count(logical=False)
             system_info["cpu_threads"] = psutil.cpu_count(logical=True)
             system_info["cpu_freq"] = f"{psutil.cpu_freq().max:.0f} MHz" if psutil.cpu_freq() else "Unknown"
 
-            # Get GPU information
             gpu_info = self.get_gpu_info()
             system_info.update(gpu_info)
 
@@ -582,7 +566,6 @@ class UIComponents:
             else:
                 info_text += f"{self.localizer.translate('system-info-error')}: {system_info['error']}\n"
 
-            # Copy to clipboard using the page's set_clipboard method
             self.page.set_clipboard(info_text)
 
             snack_bar = ft.SnackBar(
@@ -703,8 +686,7 @@ class UIComponents:
             ft.Icons.STORAGE
         )
 
-        # Action buttons
-        close_button = ft.TextButton(
+        self.close_button = ft.TextButton(
             text=self.localizer.translate("close"),
             style=ft.ButtonStyle(
                 padding=ft.padding.symmetric(horizontal=24, vertical=12),
@@ -724,7 +706,7 @@ class UIComponents:
             on_click=lambda e: self.page.close(self.info_dialog)
         )
 
-        copy_button = ft.TextButton(
+        self.copy_button = ft.TextButton(
             text=self.localizer.translate("copy-info"),
             icon=ft.Icons.COPY,
             style=ft.ButtonStyle(
@@ -754,7 +736,8 @@ class UIComponents:
                 storage_card
             ], spacing=8, scroll=ft.ScrollMode.AUTO),
             height=500,
-            width=850
+            width=850,
+
         )
 
         self.info_dialog = ft.AlertDialog(
@@ -774,9 +757,9 @@ class UIComponents:
             actions=[
                 ft.Container(
                     content=ft.Row([
-                        copy_button,
+                        self.copy_button,
                         ft.Container(width=12),
-                        close_button
+                        self.close_button
                     ], alignment=ft.MainAxisAlignment.END, spacing=0),
                     padding=ft.padding.only(top=16)
                 )
@@ -837,7 +820,7 @@ class UIComponents:
                     color=ft.Colors.AMBER_400,
                     size=52
                 ),
-                ft.Container(height=16),  # Spacer
+                ft.Container(height=16),
                 ft.Text(
                     self.localizer.translate("uninstall-dialog"),
                     size=16,
@@ -939,11 +922,22 @@ class UIComponents:
             )
         )
 
+        self.theme = ft.IconButton(
+            icon=ft.Icons.SUNNY,
+            on_click=None,
+            style=ft.ButtonStyle(
+                padding=0,
+                color="white",
+                icon_size=30
+            )
+        )
+
         self.appbar = ft.AppBar(
             title=self.app_bar_file_pick,
             center_title=True,
             actions=[
                 self.info_bar,
+                self.theme,
                 self.language_change
             ],
         )
@@ -1181,6 +1175,7 @@ class StewartInstaller:
             item.on_click = self.change_locale
 
         self.ui_components.info_bar.on_click = self.launch_info_dialog
+        self.ui_components.theme.on_click = self.change_theme
         self.ui_components.install_button.on_click = self.install
         self.ui_components.update_button.on_click = self.update
         self.ui_components.remove_button.on_click = lambda e: self.page.open(self.ui_components.remove_dialog)
@@ -1200,11 +1195,22 @@ class StewartInstaller:
 
         remote_version = self.version_manager.get_remote_version(version_info["repository"])
         if not remote_version:
+            self.ui_components.create_info_dialog()
+            self.page.update()
             return
 
         self.local_version = version_info["version"]
         self.remote_version = remote_version
         self.existing_installation_folder = version_info["path"]
+
+        self.ui_components.local_version = self.local_version
+        self.ui_components.remote_version = self.remote_version
+        self.ui_components.existing_installation_folder = self.existing_installation_folder
+        self.ui_components.page = self.page
+
+        self.ui_components.create_info_dialog()
+
+        self.page.update()
 
         if remote_version != version_info["version"] or self.version_manager.has_relevant_updates(version_info["path"], self.git_manager.excluded_dirs):
             self._handle_update_available(version_info, remote_version)
@@ -1226,6 +1232,8 @@ class StewartInstaller:
         self.ui_components.remove_button.disabled = True
         self.ui_components.remove_button.opacity = 0.4
         self.ui_components.remove_button.update()
+
+        self.ui_components.create_info_dialog()
 
         self._update_info(self.localizer.translate("found-no-install"))
         self.page.update()
@@ -1286,14 +1294,125 @@ class StewartInstaller:
         )
         self.ui_components.overview.update()
 
-    def launch_info_dialog(self, e):
-        self.ui_components.local_version = self.local_version
-        self.ui_components.remote_version = self.remote_version
-        self.ui_components.existing_installation_folder = self.existing_installation_folder
-        self.ui_components.page = self.page
-
-        self.ui_components.create_info_dialog()
+    def launch_info_dialog(self, e):        #
         self.page.open(self.ui_components.info_dialog)
+
+    def change_theme(self, e):
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        self.page.theme_mode = ft.ThemeMode.LIGHT if is_dark else ft.ThemeMode.DARK
+
+        if is_dark:
+            self._set_light_theme()
+        else:
+            self._set_dark_theme()
+
+        self.page.update()
+
+    def _set_light_theme(self):
+        ui = self.ui_components
+
+        ui.theme.icon = ft.Icons.MODE_NIGHT
+        ui.theme.style.color = ft.Colors.BLACK
+        ui.info_bar.style.color = ft.Colors.BLACK
+        ui.language_change.style.color = ft.Colors.BLACK
+        ui.app_bar_file_pick.style.color = ft.Colors.BLACK
+
+        ui.close_button.style.bgcolor = ft.Colors.with_opacity(0.1, ft.Colors.BLACK)
+        ui.info_dialog.title.content.controls[1].color = ft.Colors.BLACK
+        ui.info_dialog.bgcolor = ft.Colors.with_opacity(0.95, "white")
+
+        ui.close_button.style.color = ft.Colors.BLACK
+        ui.close_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, ft.Colors.BLACK)
+        }
+
+        ui.remove_no_button.style.color = ft.Colors.BLACK
+        ui.remove_no_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, ft.Colors.BLACK)
+        }
+
+        ui.remove_yes_button.style.color = ft.Colors.BLACK
+        ui.remove_yes_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, ft.Colors.BLACK)
+        }
+
+        ui.remove_dialog.title.content.color = ft.Colors.BLACK
+        ui.remove_dialog.bgcolor = ft.Colors.with_opacity(0.95, "white")
+        ui.remove_dialog.content.content.controls[2].color = ft.Colors.with_opacity(0.8, ft.Colors.BLACK)
+
+        self._style_cards(
+            ft.Colors.with_opacity(0.05, ft.Colors.BLACK),
+            ft.Colors.BLACK,
+            ft.Colors.with_opacity(0.7, ft.Colors.BLACK),
+            ft.Colors.BLACK
+        )
+
+        ui.remove_button.style.color = "white"
+        ui.remove_button.style.bgcolor = ft.Colors.GREY_900
+        ui.remove_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, ft.Colors.GREY_900),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, ft.Colors.GREY_900)
+        }
+
+    def _set_dark_theme(self):
+        ui = self.ui_components
+
+        ui.theme.icon = ft.Icons.SUNNY
+        ui.theme.style.color = None
+        ui.info_bar.style.color = None
+        ui.language_change.style.color = None
+        ui.app_bar_file_pick.style.color = "white"
+
+        ui.close_button.style.bgcolor = ft.Colors.with_opacity(0.1, "white")
+        ui.info_dialog.title.content.controls[1].color = "white"
+        ui.info_dialog.bgcolor = ft.Colors.with_opacity(0.95, ft.Colors.GREY_900)
+
+        ui.remove_no_button.style.color = "white"
+        ui.remove_no_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, "white"),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, "white")
+        }
+
+        ui.close_button.style.color = "white"
+        ui.close_button.style.overlay_color={
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.05, "white"),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.1, "white")
+        }
+
+        ui.remove_yes_button.style.color = "white"
+        ui.remove_yes_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+        }
+
+        ui.remove_dialog.title.content.color = "white"
+        ui.remove_dialog.bgcolor = ft.Colors.with_opacity(0.95, ft.Colors.GREY_900)
+        ui.remove_dialog.content.content.controls[2].color = ft.Colors.with_opacity(0.8, "white")
+
+        self._style_cards(
+            ft.Colors.with_opacity(0.05, "white"),
+            "white",
+            ft.Colors.with_opacity(0.7, "white"),
+            "white"
+        )
+
+        ui.remove_button.style.color = "white"
+        ui.remove_button.style.bgcolor = ft.Colors.with_opacity(0.1, "white")
+        ui.remove_button.style.overlay_color = {
+            ft.ControlState.HOVERED: ft.Colors.with_opacity(0.1, "white"),
+            ft.ControlState.PRESSED: ft.Colors.with_opacity(0.2, "white")
+        }
+
+    def _style_cards(self, card_bg, title_color, primary_color, secondary_color):
+        for card in self.ui_components.info_dialog.content.content.controls:
+            card.bgcolor = card_bg
+            card.content.controls[0].controls[1].color = title_color
+            for item in card.content.controls[2].controls:
+                item.controls[0].color = primary_color
+                item.controls[1].color = secondary_color
 
     def update(self, e):
         self.ui_components.remove_button.disabled = True
@@ -1352,6 +1471,12 @@ class StewartInstaller:
         self.ui_components.remove_dialog.title.content.value = self.localizer.translate("confirm-uninstall")
         self.ui_components.remove_dialog.content.content.controls[2].value = self.localizer.translate(
             "uninstall-dialog")
+
+        self.ui_components.language_change.tooltip = self.localizer.translate("choose-lang")
+        self.ui_components.language_change.update()
+
+        self.ui_components.theme.tooltip = self.localizer.translate("theme-tooltip")
+        self.ui_components.theme.update()
 
         self.ui_components.install_button.text = self.localizer.translate("install")
         self.ui_components.remove_button.text = self.localizer.translate("delete")
@@ -1607,7 +1732,7 @@ class StewartInstaller:
         self.page.window.height = 680
         self.page.window.width = 1080
         self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.title = "Stewart"
+        self.page.title = "Stewart Installer"
         self.page.appbar = self.ui_components.appbar
 
     def _add_page_content(self):

@@ -1,6 +1,7 @@
 install: "Install"
 update: "Update"
 "yes": "Yes, delete"
+theme-tooltip: "Change the theme"
 confirm-uninstall: "Confirmation"
 abort-install: "Aborting installation, please specify a directory"
 uninstall-dialog: "Do you want to uninstall Stewart?"
