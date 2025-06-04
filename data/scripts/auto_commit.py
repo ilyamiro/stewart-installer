@@ -13,7 +13,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 logging.basicConfig(level=logging.INFO)
 
 CHANNEL = "@stewart_github"
-REPO_URL = "https://github.com/ilyamiro/stewart"
+REPO_URL = "https://github.com/ilyamiro/stewart-installer"
 
 
 def run_git_command(args, use_shell=False):
